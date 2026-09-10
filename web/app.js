@@ -702,14 +702,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     container.classList.remove('hidden');
     stepsContainer.innerHTML = trace.steps.map(s => {
-      const stepNum = s && s.step !== undefined ? String(s.step) : '•';
-      const action = s && s.action ? String(s.action) : 'Step';
-      const details = s && s.details ? String(s.details) : '';
+      const stepNum = s && (s.step_id !== undefined ? s.step_id : (s.step !== undefined ? s.step : '•'));
+      const action = s && (s.name || s.action || 'Step');
+      const details = s && (s.description || (typeof s.details === 'string' ? s.details : (s.details ? JSON.stringify(s.details) : '')) || '');
+      const toolBadge = s && s.tool ? `<span class="badge-tag">${escapeHtml(s.tool)}</span>` : '';
+      const provBadge = s && s.provenance ? `<span class="badge-tag prov">${escapeHtml(String(s.provenance).toUpperCase())}</span>` : '';
       return `
         <div class="trace-step-item">
-          <span class="trace-step-num">${escapeHtml(stepNum)}</span>
+          <span class="trace-step-num">${escapeHtml(String(stepNum))}</span>
           <div class="trace-step-content">
-            <strong>${escapeHtml(action)}:</strong> ${escapeHtml(details)}
+            <strong>${escapeHtml(action)}</strong> ${toolBadge} ${provBadge}
+            <div class="trace-step-desc">${escapeHtml(details)}</div>
           </div>
         </div>
       `;

@@ -59,6 +59,14 @@ def create_sample_geotiffs():
     Image.fromarray(urban_arr).save(urban_path)
     print(f"Created Sample PNG: {urban_path}")
 
+    # 2b. Sample PNG: Water body scene
+    water_arr = np.random.randint(100, 180, (256, 256, 3), dtype=np.uint8)
+    # Distinct water body in center/east sector with high blue / low red
+    water_arr[50:170, 75:190] = [20, 70, 190]
+    water_path = SAMPLES_DIR / "sample_water.png"
+    Image.fromarray(water_arr).save(water_path)
+    print(f"Created Sample PNG: {water_path}")
+
     # 3. Bi-Temporal Pair: Flood/Disaster Change (T1 Pre-flood, T2 Post-flood)
     t1_arr = np.random.randint(120, 200, (height, width, 3), dtype=np.uint8)
     t1_arr[:, :, 1] += 30  # Green vegetated riverbank
