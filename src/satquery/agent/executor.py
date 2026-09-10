@@ -78,23 +78,57 @@ class AgentExecutor:
         # -------------------------------------------------------------
         s1_start = time.time()
         val_tool = self.tool_registry.get_tool("InputValidationTool")
-        val1, _ = validate_input_image(img1)
+
+        # Extract explicit user/slot modality hints
+        m1_hint = (primary_metadata or {}).get("user_modality") or (primary_metadata or {}).get("modality") or (primary_metadata or {}).get("slot_modality")
+        m2_hint = (secondary_metadata or {}).get("user_modality") or (secondary_metadata or {}).get("modality") or (secondary_metadata or {}).get("slot_modality")
+
+        is_optical_sar_ctx = (
+            (task_override and task_override.lower() in ("optical_sar_fusion", "optical_sar", "crossmodal", "fusion"))
+            or ("sar" in query.lower() and "optical" in query.lower())
+            or ("radar" in query.lower() and "optical" in query.lower())
+            or ("sar" in query.lower() and "cloud" in query.lower())
+        )
+
+        if is_optical_sar_ctx:
+            if not m1_hint:
+                m1_hint = "OPTICAL"
+            if not m2_hint and img2 is not None:
+                m2_hint = "SAR"
+
+        val1, _ = validate_input_image(
+            img1,
+            explicit_modality=m1_hint,
+            metadata=primary_metadata,
+        )
+
+        val2 = None
+        if img2 is not None:
+            val2, _ = validate_input_image(
+                img2,
+                explicit_modality=m2_hint,
+                metadata=secondary_metadata,
+            )
+            modalities = [val1.modality, val2.modality]
+            if is_optical_sar_ctx or (val1.modality == "OPTICAL" and val2.modality == "SAR"):
+                desc = f"Optical image → {val1.modality}, Radar image → {val2.modality}"
+            else:
+                desc = f"Primary image → {val1.modality}, Secondary image → {val2.modality}"
+        else:
+            modalities = [val1.modality]
+            desc = f"Validated primary image ({val1.shape[1]}x{val1.shape[0]} px, {val1.modality}, {val1.bands} bands)."
+
         trace_steps.append(
             ExecutionStep(
                 step_id=1,
                 name="InputModalityAnalysis",
-                description=f"Validated primary image ({val1.shape[1]}x{val1.shape[0]} px, {val1.modality}, {val1.bands} bands).",
+                description=desc,
                 tool="InputValidationTool",
-                status="SUCCESS" if val1.valid else "FAILED",
+                status="SUCCESS" if val1.valid and (val2 is None or val2.valid) else "FAILED",
                 latency_sec=round(time.time() - s1_start, 4),
-                details={"primary": val1.model_dump()},
+                details={"primary": val1.model_dump(), "secondary": val2.model_dump() if val2 else None},
             )
         )
-
-        modalities = [val1.modality]
-        if img2 is not None:
-            val2, _ = validate_input_image(img2)
-            modalities.append(val2.modality)
 
         # -------------------------------------------------------------
         # STEP 2: Query Intent Analysis
@@ -150,11 +184,68 @@ class AgentExecutor:
             )
         )
 
+        # -------------------------------------------------------------
+        # VALIDATION GATE: Dual-image check & Modality verification
+        # -------------------------------------------------------------
+        if intent.task == AgentTaskType.OPTICAL_SAR_FUSION:
+            if img2 is None:
+                msg = "Workflow 'optical_sar_fusion' requires two uploaded images. Please provide one optical image and one SAR/radar image for this analysis."
+                total_lat = time.time() - start_time
+                trace = ExecutionTrace(
+                    request_id=req_id,
+                    timestamp=timestamp,
+                    input_summary={"num_images": 1, "modalities": modalities},
+                    query=query,
+                    intent=intent.model_dump(),
+                    plan=plan.stages,
+                    steps=trace_steps,
+                    tools_used=["InputValidationTool"],
+                    errors=[msg],
+                    total_latency_sec=round(total_lat, 3),
+                    final_status="REJECTED",
+                )
+                return AnswerSynthesizer.synthesize(
+                    task=AgentTaskType.VALIDATION_ERROR.value,
+                    answer=msg,
+                    tool_used="InputValidationTool",
+                    model_name="ValidatorEngine",
+                    model_mode="REAL",
+                    rs_adaptation="NOT LOADED",
+                    confidence=None,
+                    execution_time_sec=total_lat,
+                    execution_trace=trace.model_dump(),
+                )
 
-        # -------------------------------------------------------------
-        # VALIDATION GATE: Dual-image check
-        # -------------------------------------------------------------
-        if plan.requires_dual_input and img2 is None:
+            mods = set(modalities)
+            if "OPTICAL" not in mods or "SAR" not in mods:
+                msg = "Please provide one optical image and one SAR/radar image for this analysis."
+                total_lat = time.time() - start_time
+                trace = ExecutionTrace(
+                    request_id=req_id,
+                    timestamp=timestamp,
+                    input_summary={"num_images": 2, "modalities": modalities},
+                    query=query,
+                    intent=intent.model_dump(),
+                    plan=plan.stages,
+                    steps=trace_steps,
+                    tools_used=["InputValidationTool"],
+                    errors=[msg],
+                    total_latency_sec=round(total_lat, 3),
+                    final_status="REJECTED",
+                )
+                return AnswerSynthesizer.synthesize(
+                    task=AgentTaskType.VALIDATION_ERROR.value,
+                    answer=msg,
+                    tool_used="InputValidationTool",
+                    model_name="ValidatorEngine",
+                    model_mode="REAL",
+                    rs_adaptation="NOT LOADED",
+                    confidence=None,
+                    execution_time_sec=total_lat,
+                    execution_trace=trace.model_dump(),
+                )
+
+        elif plan.requires_dual_input and img2 is None:
             msg = (
                 f"Workflow '{intent.task.value}' requires two uploaded images, but only one image was provided. "
                 "Please upload both primary and secondary scenes to execute this analysis."
@@ -184,39 +275,6 @@ class AgentExecutor:
                 execution_time_sec=total_lat,
                 execution_trace=trace.model_dump(),
             )
-
-        if intent.task == AgentTaskType.OPTICAL_SAR_FUSION and img2 is not None:
-            mods = set(modalities)
-            if "OPTICAL" not in mods or "SAR" not in mods:
-                msg = (
-                    f"Optical-SAR fusion requires one Optical and one SAR radar scene. "
-                    f"Received modalities: {modalities[0]} and {modalities[1]}."
-                )
-                total_lat = time.time() - start_time
-                trace = ExecutionTrace(
-                    request_id=req_id,
-                    timestamp=timestamp,
-                    input_summary={"num_images": 2, "modalities": modalities},
-                    query=query,
-                    intent=intent.model_dump(),
-                    plan=plan.stages,
-                    steps=trace_steps,
-                    tools_used=["InputValidationTool"],
-                    errors=[msg],
-                    total_latency_sec=round(total_lat, 3),
-                    final_status="REJECTED",
-                )
-                return AnswerSynthesizer.synthesize(
-                    task=AgentTaskType.VALIDATION_ERROR.value,
-                    answer=msg,
-                    tool_used="InputValidationTool",
-                    model_name="ValidatorEngine",
-                    model_mode="REAL",
-                    rs_adaptation="NOT LOADED",
-                    confidence=None,
-                    execution_time_sec=total_lat,
-                    execution_trace=trace.model_dump(),
-                )
 
         # -------------------------------------------------------------
         # STEP 4: Model Selection & Specialist Execution
@@ -436,8 +494,10 @@ class AgentExecutor:
             fr = fusion_tool.execute(img1, img2, query, optical_meta=primary_metadata, sar_meta=secondary_metadata)
             final_answer = fr.summary
             confidence_val = fr.confidence
-            model_mode = "real"
-            evidence_used_label = "NONE"
+            model_name = "RS-CrossModalSynergy-v1"
+            model_mode = "REAL"
+            rs_adaptation = "NOT LOADED"
+            evidence_used_label = "FUSION"
             for ev_str in fr.fused_evidence:
                 evidence_items.append(
                     EvidenceItem(
@@ -448,8 +508,8 @@ class AgentExecutor:
                         provenance="REAL",
                     )
                 )
-            headline_out = "Optical + SAR cross-modal consensus"
-            details_out = "Combined visible colors with radar microwave penetration."
+            headline_out = "Optical and SAR images were successfully combined."
+            details_out = final_answer
             location_summary_out = "Across full scene"
             visual_summary_out = "Multi-sensor cross-validation"
             confidence_level_out = "High"
@@ -548,6 +608,7 @@ class AgentExecutor:
         trace_dict = {
             "task": intent.task.value,
             "validation_status": "PASSED",
+            "final_status": "COMPLETED",
             "tool_used": tool_used_name,
             "model_used": model_name,
             "model_mode": model_mode,

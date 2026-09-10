@@ -52,21 +52,47 @@ class PairValidationResult(BaseModel):
     errors: List[str] = Field(default_factory=list, description="Pair-level errors")
 
 
-def detect_modality(img_arr: np.ndarray, metadata: Dict[str, Any]) -> str:
+def detect_modality(
+    img_arr: np.ndarray,
+    metadata: Optional[Dict[str, Any]] = None,
+    explicit_modality: Optional[str] = None,
+) -> str:
     """
-    Robustly identify sensor modality from pixel channels, statistics, and metadata.
+    Robustly identify sensor modality from user slot, metadata, pixel statistics, and band counts.
+    Priority hierarchy:
+      1. Explicit user/slot modality parameter
+      2. Metadata modality flag / radar polarization tags
+      3. Filename indicators (sar, radar, s1, etc.)
+      4. Pixel statistics (single band -> SAR, 3-band duplicate grayscale -> SAR, >=4 bands -> MULTISPECTRAL)
+      5. Fallback default (OPTICAL)
     """
-    driver = str(metadata.get("driver", "")).upper()
-    count = metadata.get("count", 3)
-    orig_name = str(metadata.get("original_filename", "")).lower()
+    # 1. Explicit user/slot parameter
+    if explicit_modality and str(explicit_modality).strip():
+        m_exp = str(explicit_modality).strip().upper()
+        if m_exp in ("OPTICAL", "SAR", "MULTISPECTRAL"):
+            return m_exp
 
-    # Explicit filename/metadata hints
+    meta = metadata or {}
+
+    # 2. Metadata dictionary check
+    m_meta = meta.get("modality") or meta.get("user_modality") or meta.get("slot_modality") or meta.get("sensor_modality")
+    if m_meta and str(m_meta).strip().upper() in ("OPTICAL", "SAR", "MULTISPECTRAL"):
+        return str(m_meta).strip().upper()
+
+    # Check for SAR polarization tags or radar metadata
+    pol = str(meta.get("polarization", "")).upper()
+    sensor = str(meta.get("sensor", "")).upper()
+    if "SAR" in sensor or "RADAR" in sensor or pol in ("VV", "VH", "HH", "HV", "VV+VH", "HH+HV"):
+        return "SAR"
+
+    # 3. Explicit filename hints
+    orig_name = str(meta.get("original_filename", "")).lower()
     if "sar" in orig_name or "s1" in orig_name or "sentinel1" in orig_name or "radar" in orig_name:
         return "SAR"
     if "opt" in orig_name or "s2" in orig_name or "sentinel2" in orig_name or "landsat" in orig_name:
         return "OPTICAL"
 
-    # Single-band / Grayscale analysis
+    # 4. Single-band / Grayscale analysis
     if img_arr.ndim == 2 or (img_arr.ndim == 3 and img_arr.shape[2] == 1):
         # Single band image
         return "SAR"
@@ -88,6 +114,8 @@ def detect_modality(img_arr: np.ndarray, metadata: Dict[str, Any]) -> str:
 def validate_input_image(
     image_input: Union[str, Path, bytes, Image.Image],
     expected_modality: Optional[str] = None,
+    explicit_modality: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
     max_size_mb: float = 100.0,
 ) -> Tuple[ValidationResult, Optional[Image.Image]]:
     """
@@ -97,6 +125,7 @@ def validate_input_image(
     warnings: List[str] = []
     errors: List[str] = []
     pil_img: Optional[Image.Image] = None
+    input_meta = dict(metadata or {})
 
     # Handle path traversal protection & format validation
     if isinstance(image_input, (str, Path)):
@@ -127,7 +156,7 @@ def validate_input_image(
         try:
             geo_img = load_image(path)
             pil_img = geo_img.pil_image
-            metadata = geo_img.metadata
+            input_meta.update(geo_img.metadata)
             arr = np.array(pil_img)
         except Exception as e:
             return ValidationResult(
@@ -139,26 +168,22 @@ def validate_input_image(
     elif isinstance(image_input, Image.Image):
         pil_img = image_input
         arr = np.array(pil_img)
-        metadata = {
-            "driver": "PIL",
-            "shape": [arr.shape[0], arr.shape[1], arr.shape[2] if arr.ndim == 3 else 1],
-            "count": arr.shape[2] if arr.ndim == 3 else 1,
-            "crs": None,
-            "is_geospatial": False,
-        }
+        input_meta.setdefault("driver", "PIL")
+        input_meta.setdefault("shape", [arr.shape[0], arr.shape[1], arr.shape[2] if arr.ndim == 3 else 1])
+        input_meta.setdefault("count", arr.shape[2] if arr.ndim == 3 else 1)
+        input_meta.setdefault("crs", None)
+        input_meta.setdefault("is_geospatial", False)
     elif isinstance(image_input, bytes):
         import io
         try:
             pil_img = Image.open(io.BytesIO(image_input))
             pil_img.load()
             arr = np.array(pil_img)
-            metadata = {
-                "driver": pil_img.format or "BYTES",
-                "shape": [arr.shape[0], arr.shape[1], arr.shape[2] if arr.ndim == 3 else 1],
-                "count": arr.shape[2] if arr.ndim == 3 else 1,
-                "crs": None,
-                "is_geospatial": False,
-            }
+            input_meta.setdefault("driver", pil_img.format or "BYTES")
+            input_meta.setdefault("shape", [arr.shape[0], arr.shape[1], arr.shape[2] if arr.ndim == 3 else 1])
+            input_meta.setdefault("count", arr.shape[2] if arr.ndim == 3 else 1)
+            input_meta.setdefault("crs", None)
+            input_meta.setdefault("is_geospatial", False)
         except Exception as e:
             return ValidationResult(
                 valid=False,
@@ -179,13 +204,13 @@ def validate_input_image(
     if width > 10000 or height > 10000:
         warnings.append(f"Very large image ({width}x{height}) may cause high latency. Resizing recommended.")
 
-    modality = detect_modality(arr, metadata)
+    modality = detect_modality(arr, input_meta, explicit_modality=explicit_modality or expected_modality)
 
-    if expected_modality and modality != expected_modality.upper():
+    if expected_modality and not explicit_modality and modality != expected_modality.upper():
         errors.append(f"Mismatched sensor modality: Expected {expected_modality.upper()}, detected {modality}.")
 
-    georeferenced = bool(metadata.get("is_geospatial", False) or metadata.get("crs"))
-    crs = metadata.get("crs")
+    georeferenced = bool(input_meta.get("is_geospatial", False) or input_meta.get("crs"))
+    crs = input_meta.get("crs")
     if not georeferenced:
         warnings.append("Image is not georeferenced (standard pixel coordinate frame will be used).")
 
@@ -197,9 +222,9 @@ def validate_input_image(
         dtype=str(arr.dtype),
         georeferenced=georeferenced,
         crs=crs,
-        bounds=metadata.get("bounds"),
-        nodata=metadata.get("nodata"),
-        file_size_kb=float(metadata.get("file_size_kb", 0.0)),
+        bounds=input_meta.get("bounds"),
+        nodata=input_meta.get("nodata"),
+        file_size_kb=float(input_meta.get("file_size_kb", 0.0)),
         warnings=warnings,
         errors=errors,
     )
@@ -210,11 +235,19 @@ def validate_image_pair(
     primary_input: Union[str, Path, bytes, Image.Image],
     secondary_input: Optional[Union[str, Path, bytes, Image.Image]],
     workflow: str = "bitemporal_change",
+    primary_modality: Optional[str] = None,
+    secondary_modality: Optional[str] = None,
+    primary_metadata: Optional[Dict[str, Any]] = None,
+    secondary_metadata: Optional[Dict[str, Any]] = None,
 ) -> PairValidationResult:
     """
     Validates a dual-image pair for bi-temporal change detection or optical-SAR fusion.
     """
-    val1, img1 = validate_input_image(primary_input)
+    val1, img1 = validate_input_image(
+        primary_input,
+        explicit_modality=primary_modality,
+        metadata=primary_metadata,
+    )
     warnings: List[str] = list(val1.warnings)
     errors: List[str] = list(val1.errors)
 
@@ -232,7 +265,11 @@ def validate_image_pair(
             errors=[f"Workflow '{workflow}' requires two images, but secondary image was not provided."],
         )
 
-    val2, img2 = validate_input_image(secondary_input)
+    val2, img2 = validate_input_image(
+        secondary_input,
+        explicit_modality=secondary_modality,
+        metadata=secondary_metadata,
+    )
     warnings.extend(val2.warnings)
     errors.extend(val2.errors)
 
@@ -253,7 +290,7 @@ def validate_image_pair(
     if workflow in ("bitemporal_change", "change"):
         if val1.modality != val2.modality:
             warnings.append(f"Bi-temporal change analysis typically requires same sensor modalities (got {val1.modality} vs {val2.modality}).")
-    elif workflow in ("optical_sar_fusion", "crossmodal"):
+    elif workflow in ("optical_sar_fusion", "crossmodal", "optical_sar"):
         mods = {val1.modality, val2.modality}
         if "OPTICAL" not in mods or "SAR" not in mods:
             modalities_compat = False

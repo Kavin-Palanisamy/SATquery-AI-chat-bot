@@ -152,6 +152,8 @@ async def preview_image_endpoint(
 async def agent_analyze_endpoint(
     question: str = Form(..., description="Natural language question or command"),
     task_mode: Optional[str] = Form(None, description="Explicit task mode: vqa, grounding, bitemporal_change, optical_sar_fusion, or auto"),
+    primary_modality: Optional[str] = Form(None, description="Explicit modality for primary image (e.g. OPTICAL, SAR)"),
+    secondary_modality: Optional[str] = Form(None, description="Explicit modality for secondary image (e.g. OPTICAL, SAR)"),
     image: UploadFile = File(..., description="Primary satellite image (GeoTIFF, TIFF, PNG, JPEG)"),
     secondary_image: Optional[UploadFile] = File(None, description="Optional secondary satellite image (GeoTIFF, TIFF, PNG, JPEG)"),
 ) -> AgentResponse:
@@ -185,8 +187,16 @@ async def agent_analyze_endpoint(
         with open(temp1_path, "wb") as buf:
             shutil.copyfileobj(image.file, buf)
 
+        p_mod = primary_modality if isinstance(primary_modality, str) else None
+        s_mod = secondary_modality if isinstance(secondary_modality, str) else None
+
         geo_img1 = load_image(temp1_path)
         geo_img1.metadata["original_filename"] = image.filename
+        if p_mod and p_mod.strip():
+            geo_img1.metadata["user_modality"] = p_mod.strip().upper()
+            geo_img1.metadata["modality"] = p_mod.strip().upper()
+        elif clean_task_mode in ("optical_sar_fusion", "fusion", "crossmodal"):
+            geo_img1.metadata.setdefault("slot_modality", "OPTICAL")
 
         # Load Secondary Image if provided
         geo_img2 = None
@@ -204,6 +214,11 @@ async def agent_analyze_endpoint(
 
             geo_img2 = load_image(temp2_path)
             geo_img2.metadata["original_filename"] = secondary_image.filename
+            if s_mod and s_mod.strip():
+                geo_img2.metadata["user_modality"] = s_mod.strip().upper()
+                geo_img2.metadata["modality"] = s_mod.strip().upper()
+            elif clean_task_mode in ("optical_sar_fusion", "fusion", "crossmodal"):
+                geo_img2.metadata.setdefault("slot_modality", "SAR")
 
         executor: AgentExecutor = getattr(app.state, "executor", None) or AgentExecutor()
 

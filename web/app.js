@@ -970,6 +970,11 @@ document.addEventListener('DOMContentLoaded', () => {
       formData.append('question', question);
       formData.append('task_mode', currentMode);
 
+      if (currentMode === 'optical_sar_fusion') {
+        formData.append('primary_modality', 'OPTICAL');
+        formData.append('secondary_modality', 'SAR');
+      }
+
       if (secondaryImageInput && secondaryImageInput.files && secondaryImageInput.files.length > 0) {
         formData.append('secondary_image', secondaryImageInput.files[0]);
       }
