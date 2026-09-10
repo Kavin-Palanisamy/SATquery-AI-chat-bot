@@ -356,22 +356,55 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('panelTitle', profile.panelTitle);
     setText('panelSubtitle', profile.panelSubtitle);
 
+    const previewsGrid = document.getElementById('previewsGrid');
+    const previewSlot2 = document.getElementById('previewSlot2');
+    const previewSlotHeader1 = document.getElementById('previewSlotHeader1');
+    const metaSection2 = document.getElementById('metaSection2');
+
     if (currentMode === 'bitemporal_change') {
       toggleHidden('secondaryGroup', false);
       setText('labelPrimaryImage', 'First Image (Before Date)');
       setText('dropTextPrimary', 'Click or drop the Before image here');
       setText('labelSecondaryImage', 'Second Image (After Date)');
       setText('dropTextSecondary', 'Click or drop the After image here');
+
+      if (previewsGrid) previewsGrid.classList.add('dual-mode');
+      if (previewSlot2) previewSlot2.classList.remove('hidden');
+      if (previewSlotHeader1) previewSlotHeader1.classList.remove('hidden');
+      if (metaSection2) metaSection2.classList.remove('hidden');
+
+      setText('previewSlotLabel1', 'Before / T1');
+      setText('previewSlotLabel2', 'After / T2');
+      setText('metaTitle1', 'Before / T1 Details');
+      setText('metaTitle2', 'After / T2 Details');
     } else if (currentMode === 'optical_sar_fusion') {
       toggleHidden('secondaryGroup', false);
       setText('labelPrimaryImage', 'Cloudy Camera Image (Optical)');
       setText('dropTextPrimary', 'Click or drop the Optical image here');
       setText('labelSecondaryImage', 'Radar Image (SAR)');
       setText('dropTextSecondary', 'Click or drop the Radar image here');
+
+      if (previewsGrid) previewsGrid.classList.add('dual-mode');
+      if (previewSlot2) previewSlot2.classList.remove('hidden');
+      if (previewSlotHeader1) previewSlotHeader1.classList.remove('hidden');
+      if (metaSection2) metaSection2.classList.remove('hidden');
+
+      setText('previewSlotLabel1', 'Optical Image');
+      setText('previewSlotLabel2', 'SAR / Radar Image');
+      setText('metaTitle1', 'Optical Image Details');
+      setText('metaTitle2', 'SAR / Radar Image Details');
     } else {
       toggleHidden('secondaryGroup', true);
       setText('labelPrimaryImage', 'Satellite Image (GeoTIFF, PNG, JPEG)');
       setText('dropTextPrimary', 'Click or drop your satellite image here');
+
+      if (previewsGrid) previewsGrid.classList.remove('dual-mode');
+      if (previewSlot2) previewSlot2.classList.add('hidden');
+      if (previewSlotHeader1) previewSlotHeader1.classList.add('hidden');
+      if (metaSection2) metaSection2.classList.add('hidden');
+
+      setText('previewSlotLabel1', 'Satellite Image');
+      setText('metaTitle1', 'Image Details');
     }
 
     // Populate Presets
@@ -448,16 +481,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div style="color: #9aa4b8; font-size: 12px; margin-top: 2px;"><strong>Files:</strong> ${escapeHtml(item.input || '—')}</div>
                 <div style="color: #5eead4; margin-top: 4px;"><strong>Result:</strong> ${escapeHtml(item.output || '—')}</div>
               </div>
-              <div style="text-align: right; flex-shrink: 0;">
-                <div style="color: #ff9a56; font-weight: 600;">${item.execution_time_sec !== undefined ? item.execution_time_sec + 's' : '—'}</div>
-                <div style="font-size: 11px; color: #6f7a8c; margin-top: 4px;">${item.timestamp ? item.timestamp.replace('T', ' ').split('.')[0] : ''}</div>
+              <div class="prov-meta">
+                <span>${escapeHtml(item.execution_time_sec !== undefined ? item.execution_time_sec + 's' : '')}</span>
+                <span>${escapeHtml(item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : '')}</span>
               </div>
             </div>
           `).join('');
         }
       }
     } catch (e) {
-      console.warn('Failed to load full provenance', e);
+      console.warn('Failed to load full provenance feed', e);
     }
   }
 
@@ -474,9 +507,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Handle File Upload & Server-side Preview
+  // Handle File Upload & Live Metadata Decoding
   async function handleFile(file, isSecondary = false) {
-    clearAlert();
     if (!file) return;
 
     if (!isSecondary) {
@@ -487,28 +519,30 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleHidden('fileInfo2', false);
     }
 
-    const imagePreview = document.getElementById('imagePreview');
     const previewPlaceholder = document.getElementById('previewPlaceholder');
+    const previewsGrid = document.getElementById('previewsGrid');
+    const imagePreview = document.getElementById('imagePreview');
+    const imagePreview2 = document.getElementById('imagePreview2');
+    const targetImg = isSecondary ? imagePreview2 : imagePreview;
 
-    if (!isSecondary) {
-      const isTiff = file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
-      if (!isTiff && file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          if (imagePreview) {
-            imagePreview.src = e.target.result;
-            imagePreview.classList.remove('hidden');
-          }
-          if (previewPlaceholder) previewPlaceholder.classList.add('hidden');
-        };
-        reader.readAsDataURL(file);
-      } else {
-        if (imagePreview) imagePreview.classList.add('hidden');
-        if (previewPlaceholder) {
-          previewPlaceholder.classList.remove('hidden');
-          const spanText = previewPlaceholder.querySelector('span');
-          if (spanText) spanText.textContent = `Normalizing GeoTIFF bands for ${file.name}...`;
+    const isTiff = file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
+    if (!isTiff && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (targetImg) {
+          targetImg.src = e.target.result;
+          targetImg.classList.remove('hidden');
         }
+        if (previewPlaceholder) previewPlaceholder.classList.add('hidden');
+        if (previewsGrid) previewsGrid.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    } else {
+      if (targetImg) targetImg.classList.add('hidden');
+      if (previewPlaceholder) {
+        previewPlaceholder.classList.remove('hidden');
+        const spanText = previewPlaceholder.querySelector('span');
+        if (spanText) spanText.textContent = `Normalizing GeoTIFF bands for ${file.name}...`;
       }
     }
 
@@ -523,17 +557,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (res.ok) {
         const data = await res.json();
-        if (!isSecondary && data.preview_url && imagePreview) {
-          imagePreview.src = data.preview_url;
-          imagePreview.classList.remove('hidden');
+        if (data.preview_url && targetImg) {
+          targetImg.src = data.preview_url;
+          targetImg.classList.remove('hidden');
           if (previewPlaceholder) previewPlaceholder.classList.add('hidden');
+          if (previewsGrid) previewsGrid.classList.remove('hidden');
         }
-        if (!isSecondary && data.metadata) {
-          setText('metaCrs', data.metadata.crs, 'Local / None');
-          const shapeVal = Array.isArray(data.metadata.shape) ? `[${data.metadata.shape.join(', ')}]` : (data.metadata.shape || '—');
-          setText('metaShape', shapeVal);
-          setText('metaBands', data.metadata.bands || data.metadata.count, '—');
-          setText('metaDriver', data.metadata.driver, 'Raster');
+        if (data.metadata) {
+          const suffix = isSecondary ? '2' : '';
+          setText(`metaCrs${suffix}`, data.metadata.crs, 'Not available');
+          const shapeVal = Array.isArray(data.metadata.shape) ? `[${data.metadata.shape.join(', ')}]` : (data.metadata.shape || 'Not available');
+          setText(`metaShape${suffix}`, shapeVal, 'Not available');
+          setText(`metaBands${suffix}`, data.metadata.bands || data.metadata.count, 'Not available');
+          setText(`metaDriver${suffix}`, data.metadata.driver, 'Not available');
         }
       }
     } catch (err) {
@@ -542,22 +578,42 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function resetFileSelection(isSecondary = false) {
+    const previewPlaceholder = document.getElementById('previewPlaceholder');
+    const imagePreview = document.getElementById('imagePreview');
+    const imagePreview2 = document.getElementById('imagePreview2');
+
     if (!isSecondary) {
       if (imageInput) imageInput.value = '';
       toggleHidden('fileInfo', true);
-      toggleHidden('imagePreview', true);
+      if (imagePreview) {
+        imagePreview.src = '';
+        imagePreview.classList.add('hidden');
+      }
       clearGroundingCanvas();
       toggleHidden('changeOverlay', true);
-      toggleHidden('previewPlaceholder', false);
-      const spanText = document.querySelector('#previewPlaceholder span');
-      if (spanText) spanText.textContent = 'Upload or select a scene to preview raster and extract coordinates';
-      setText('metaCrs', '—');
-      setText('metaShape', '—');
-      setText('metaBands', '—');
-      setText('metaDriver', '—');
+      setText('metaCrs', 'Not available');
+      setText('metaShape', 'Not available');
+      setText('metaBands', 'Not available');
+      setText('metaDriver', 'Not available');
     } else {
       if (secondaryImageInput) secondaryImageInput.value = '';
       toggleHidden('fileInfo2', true);
+      if (imagePreview2) {
+        imagePreview2.src = '';
+        imagePreview2.classList.add('hidden');
+      }
+      setText('metaCrs2', 'Not available');
+      setText('metaShape2', 'Not available');
+      setText('metaBands2', 'Not available');
+      setText('metaDriver2', 'Not available');
+    }
+
+    const hasPrim = imagePreview && imagePreview.src && !imagePreview.classList.contains('hidden');
+    const hasSec = imagePreview2 && imagePreview2.src && !imagePreview2.classList.contains('hidden');
+    if (!hasPrim && !hasSec && previewPlaceholder) {
+      previewPlaceholder.classList.remove('hidden');
+      const spanText = previewPlaceholder.querySelector('span');
+      if (spanText) spanText.textContent = 'Upload or select a scene to preview raster and extract coordinates';
     }
   }
 
@@ -859,11 +915,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Display Metadata
     if (data.metadata && typeof data.metadata === 'object') {
-      setText('metaCrs', data.metadata.crs, 'Non-georeferenced');
-      const shapeStr = Array.isArray(data.metadata.shape) ? `[${data.metadata.shape.join(', ')}]` : (data.metadata.shape || '—');
-      setText('metaShape', shapeStr, '—');
-      setText('metaBands', data.metadata.count || data.metadata.bands, '—');
-      setText('metaDriver', data.metadata.driver, '—');
+      setText('metaCrs', data.metadata.crs, 'Not available');
+      const shapeStr = Array.isArray(data.metadata.shape) ? `[${data.metadata.shape.join(', ')}]` : (data.metadata.shape || 'Not available');
+      setText('metaShape', shapeStr, 'Not available');
+      setText('metaBands', data.metadata.count || data.metadata.bands, 'Not available');
+      setText('metaDriver', data.metadata.driver, 'Not available');
+
+      const secMeta = data.secondary_metadata || data.metadata.secondary_metadata;
+      if (secMeta && typeof secMeta === 'object') {
+        setText('metaCrs2', secMeta.crs, 'Not available');
+        const shapeStr2 = Array.isArray(secMeta.shape) ? `[${secMeta.shape.join(', ')}]` : (secMeta.shape || 'Not available');
+        setText('metaShape2', shapeStr2, 'Not available');
+        setText('metaBands2', secMeta.count || secMeta.bands, 'Not available');
+        setText('metaDriver2', secMeta.driver, 'Not available');
+      }
     }
 
     loadProvenance();

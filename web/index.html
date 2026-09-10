@@ -229,10 +229,28 @@
                 <div class="placeholder-icon">🔭</div>
                 <span>Upload an image to see the preview here</span>
               </div>
-              <div class="preview-canvas-container" id="canvasContainer">
-                <img id="imagePreview" class="image-preview hidden" alt="Satellite Preview">
-                <img id="changeOverlay" class="change-overlay hidden" alt="Change Overlay">
-                <canvas id="groundingCanvas" class="grounding-canvas hidden"></canvas>
+              <div class="previews-grid" id="previewsGrid">
+                <!-- Primary Image Slot -->
+                <div class="preview-slot" id="previewSlot1">
+                  <div class="preview-slot-header hidden" id="previewSlotHeader1">
+                    <span class="preview-slot-label" id="previewSlotLabel1">Satellite Image</span>
+                  </div>
+                  <div class="preview-canvas-container" id="canvasContainer">
+                    <img id="imagePreview" class="image-preview hidden" alt="Satellite Preview">
+                    <img id="changeOverlay" class="change-overlay hidden" alt="Change Overlay">
+                    <canvas id="groundingCanvas" class="grounding-canvas hidden"></canvas>
+                  </div>
+                </div>
+
+                <!-- Secondary Image Slot (Visible in 2-image workflows) -->
+                <div class="preview-slot hidden" id="previewSlot2">
+                  <div class="preview-slot-header" id="previewSlotHeader2">
+                    <span class="preview-slot-label" id="previewSlotLabel2">SAR / Radar Image</span>
+                  </div>
+                  <div class="preview-canvas-container" id="canvasContainer2">
+                    <img id="imagePreview2" class="image-preview hidden" alt="Secondary Satellite Preview">
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -249,27 +267,56 @@
             </div>
 
             <!-- Image Details Drawer -->
-            <div class="metadata-container">
-              <div class="meta-header">
-                <span class="meta-title">Image Details</span>
-                <span class="meta-badge">Map Coordinates</span>
+            <div class="metadata-container" id="metadataContainer">
+              <!-- Primary Image Metadata -->
+              <div class="meta-section" id="metaSection1">
+                <div class="meta-header" id="metaHeader1">
+                  <span class="meta-title" id="metaTitle1">Image Details</span>
+                  <span class="meta-badge" id="metaBadge1">Map Coordinates</span>
+                </div>
+                <div class="meta-grid" id="metadataGrid">
+                  <div class="meta-item">
+                    <span class="meta-lbl">Map System (CRS)</span>
+                    <span class="meta-val" id="metaCrs">Not available</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-lbl">Dimensions [H, W]</span>
+                    <span class="meta-val" id="metaShape">Not available</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-lbl">Color Layers</span>
+                    <span class="meta-val" id="metaBands">Not available</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-lbl">File Type</span>
+                    <span class="meta-val" id="metaDriver">Not available</span>
+                  </div>
+                </div>
               </div>
-              <div class="meta-grid" id="metadataGrid">
-                <div class="meta-item">
-                  <span class="meta-lbl">Map System (CRS)</span>
-                  <span class="meta-val" id="metaCrs">—</span>
+
+              <!-- Secondary Image Metadata (Visible in 2-image workflows) -->
+              <div class="meta-section hidden" id="metaSection2">
+                <div class="meta-header meta-header-sec" id="metaHeader2">
+                  <span class="meta-title" id="metaTitle2">SAR / Radar Image Details</span>
+                  <span class="meta-badge" id="metaBadge2">Secondary Scene</span>
                 </div>
-                <div class="meta-item">
-                  <span class="meta-lbl">Dimensions [H, W]</span>
-                  <span class="meta-val" id="metaShape">—</span>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-lbl">Color Layers</span>
-                  <span class="meta-val" id="metaBands">—</span>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-lbl">File Type</span>
-                  <span class="meta-val" id="metaDriver">—</span>
+                <div class="meta-grid" id="metadataGrid2">
+                  <div class="meta-item">
+                    <span class="meta-lbl">Map System (CRS)</span>
+                    <span class="meta-val" id="metaCrs2">Not available</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-lbl">Dimensions [H, W]</span>
+                    <span class="meta-val" id="metaShape2">Not available</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-lbl">Color Layers</span>
+                    <span class="meta-val" id="metaBands2">Not available</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-lbl">File Type</span>
+                    <span class="meta-val" id="metaDriver2">Not available</span>
+                  </div>
                 </div>
               </div>
             </div>

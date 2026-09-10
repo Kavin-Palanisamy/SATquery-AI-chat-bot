@@ -57,7 +57,10 @@ async function runE2ETests() {
     'resAnswer', 'resTask', 'resTool', 'resModel', 'resInput', 'resLatency',
     'resConfidence', 'routingReasonBanner', 'routingReasonText',
     'agentTraceContainer', 'traceSteps', 'metaCrs', 'metaShape', 'metaBands',
-    'metaDriver', 'labelPrimaryImage', 'dropTextPrimary', 'labelSecondaryImage',
+    'metaDriver', 'metaCrs2', 'metaShape2', 'metaBands2', 'metaDriver2',
+    'previewsGrid', 'previewSlot1', 'previewSlot2', 'previewSlotHeader1', 'previewSlotHeader2',
+    'previewSlotLabel1', 'previewSlotLabel2', 'imagePreview', 'imagePreview2',
+    'labelPrimaryImage', 'dropTextPrimary', 'labelSecondaryImage',
     'dropTextSecondary', 'groundingCanvas', 'changeOverlay', 'toggleGrounding',
     'toggleChange', 'toggleChangeLayer', 'layerControls', 'provenanceFeedFull'
   ];
