@@ -278,6 +278,64 @@ async def get_recent_executions(limit: int = 10) -> List[Dict[str, Any]]:
     return records
 
 
+@app.post("/query", response_model=AgentResponse)
+async def query_endpoint(
+    question: str = Form(..., description="Natural language remote sensing query"),
+    image: UploadFile = File(..., description="Satellite image file (GeoTIFF, TIFF, PNG, JPEG)"),
+    secondary_image: Optional[UploadFile] = File(None, description="Optional secondary satellite image"),
+    task_mode: Optional[str] = Form("auto", description="Task mode override"),
+) -> AgentResponse:
+    """Primary analytical query endpoint supporting multi-step agent workflows."""
+    return await agent_analyze_endpoint(question=question, image=image, secondary_image=secondary_image, task_mode=task_mode)
+
+
+@app.post("/ground", response_model=AgentResponse)
+async def ground_endpoint(
+    target: str = Form(..., description="Target object or land cover to localize"),
+    image: UploadFile = File(..., description="Satellite image file (GeoTIFF, TIFF, PNG, JPEG)"),
+) -> AgentResponse:
+    """Dedicated visual grounding and localization endpoint."""
+    query = f"Find and highlight the {target} in this image."
+    return await agent_analyze_endpoint(question=query, image=image, secondary_image=None, task_mode="grounding")
+
+
+@app.post("/change", response_model=AgentResponse)
+async def change_endpoint(
+    question: Optional[str] = Form("What changed between these two observation dates?", description="Change query"),
+    image: UploadFile = File(..., description="Observation T1 image (pre-event)"),
+    secondary_image: UploadFile = File(..., description="Observation T2 image (post-event)"),
+) -> AgentResponse:
+    """Dedicated bi-temporal change analysis endpoint."""
+    return await agent_analyze_endpoint(question=question, image=image, secondary_image=secondary_image, task_mode="bitemporal_change")
+
+
+@app.post("/fusion", response_model=AgentResponse)
+async def fusion_endpoint(
+    question: Optional[str] = Form("Use optical and SAR images together to identify features.", description="Fusion query"),
+    image: UploadFile = File(..., description="Primary optical satellite image"),
+    secondary_image: UploadFile = File(..., description="Co-registered SAR radar image"),
+) -> AgentResponse:
+    """Dedicated optical + SAR cross-modal fusion endpoint."""
+    return await agent_analyze_endpoint(question=question, image=image, secondary_image=secondary_image, task_mode="optical_sar_fusion")
+
+
+@app.get("/execution/{record_id}")
+async def get_execution_by_id(record_id: str) -> Dict[str, Any]:
+    """Retrieves a specific execution trace record by request or execution ID."""
+    records = await get_recent_executions(limit=50)
+    for rec in records:
+        if str(rec.get("request_id")) == record_id or str(rec.get("id")) == record_id:
+            return rec
+    if records:
+        try:
+            idx = int(record_id)
+            if 0 <= idx < len(records):
+                return records[idx]
+        except ValueError:
+            pass
+    raise HTTPException(status_code=404, detail=f"Execution trace for ID '{record_id}' not found.")
+
+
 @app.get("/report/{execution_idx}")
 async def generate_audit_report(execution_idx: int = 0) -> PlainTextResponse:
     """Generates a downloadable Markdown audit report for a given execution record."""

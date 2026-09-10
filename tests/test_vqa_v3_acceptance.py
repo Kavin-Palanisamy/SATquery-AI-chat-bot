@@ -136,3 +136,25 @@ def test_acceptance_10_no_cross_query_contamination(sample_png_image):
     )
     assert res1.answer != res2.answer
     assert res1.answer not in res2.answer
+
+
+def test_acceptance_11_no_fabricated_percentage_without_segmentation(sample_png_image):
+    """TEST 11: Run 'What percentage of the image is water?' with no segmentation evidence -> NO FABRICATED NUMBER."""
+    from satquery.tools.vqa import RemoteSensingVQATool
+    vqa_tool = RemoteSensingVQATool()
+    img = Image.open(sample_png_image)
+    res = vqa_tool.execute(img, "What percentage of the image is water?", context={})
+    assert "cannot reliably calculate" in res.answer.lower()
+    assert "%" not in res.answer
+
+
+def test_acceptance_12_model_status_loaded_unloaded():
+    """TEST 12: Check model status -> Expected actual loaded/unloaded status accurately reported."""
+    from satquery.models.registry import get_model_registry
+    registry = get_model_registry()
+    vqa_model = registry.get_model("VQA")
+    assert vqa_model is not None
+    # RS adaptation is accurately reported as NOT LOADED until a real adapter checkpoint exists on disk
+    assert vqa_model.rs_adaptation_status == "NOT LOADED"
+    assert vqa_model.loaded is False  # Lazy loaded
+

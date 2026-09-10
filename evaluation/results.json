@@ -1,0 +1,42 @@
+{
+  "system": "SatQuery AI",
+  "version": "v3.0.0",
+  "timestamp": "2026-09-10T15:40:00Z",
+  "evaluation_mode": "TRUTHFUL_CALIBRATION_GATE",
+  "benchmarks": {
+    "vqa": {
+      "model": "Qwen2-VL-RS",
+      "provenance": "MOCK",
+      "adaptation": "NOT LOADED",
+      "dataset": "RSVQA-HR",
+      "total_evaluated": 0,
+      "measured_accuracy": null,
+      "status": "AWAITING_LOCAL_BENCHMARK_DOWNLOAD"
+    },
+    "grounding": {
+      "model": "RS-SpectralHeuristic-Grounder-v1",
+      "provenance": "HEURISTIC",
+      "dataset": "VRSBench",
+      "total_evaluated": 0,
+      "measured_iou": null,
+      "status": "AWAITING_LOCAL_BENCHMARK_DOWNLOAD"
+    },
+    "change": {
+      "model": "RS-ClassicalSpectralChange-v1",
+      "provenance": "REAL",
+      "dataset": "CDVQA",
+      "total_evaluated": 0,
+      "measured_f1": null,
+      "status": "AWAITING_LOCAL_BENCHMARK_DOWNLOAD"
+    },
+    "optical_sar_fusion": {
+      "model": "RS-CrossModalSynergy-v1",
+      "provenance": "REAL",
+      "dataset": "Sentinel-1/2 Co-registered Pairs",
+      "total_evaluated": 0,
+      "measured_accuracy": null,
+      "status": "AWAITING_LOCAL_BENCHMARK_DOWNLOAD"
+    }
+  },
+  "truthfulness_declaration": "No synthetic benchmark scores are reported. Only actual evaluated numbers on downloaded test sets will populate measured fields."
+}

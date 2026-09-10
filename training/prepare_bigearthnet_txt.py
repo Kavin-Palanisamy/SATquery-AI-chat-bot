@@ -33,7 +33,10 @@ def prepare_bigearthnet_txt(source_dir: str, output_manifest: str):
         for s in samples:
             f.write(json.dumps(s) + "\n")
 
-    print(f"Generated training manifest with {len(samples)} samples: {output_manifest}")
+def prepare_bigearthnet_vqa_dataset(input_txt_path: str = "data/BigEarthNet.txt", output_dir: str = "data/processed"):
+    """Prepares BigEarthNet dataset from input index."""
+    out_manifest = Path(output_dir) / "bigearthnet_train.jsonl"
+    prepare_bigearthnet_txt(source_dir=str(Path(input_txt_path).parent), output_manifest=str(out_manifest))
 
 
 if __name__ == "__main__":

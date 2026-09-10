@@ -45,8 +45,15 @@ def cli_main():
     fuse_parser.add_argument("sar", type=str, help="Path to SAR radar image")
     fuse_parser.add_argument("question", type=str, nargs="?", default="Use optical and SAR together to identify features.", help="Fusion question")
 
-    # 8. Train Status
+    # 8. Capabilities
+    subparsers.add_parser("capabilities", help="Show system capabilities summary")
+
+    # 9. Train Status
     subparsers.add_parser("train-status", help="Display domain adaptation training status")
+
+    # 10. Evaluate
+    eval_parser = subparsers.add_parser("evaluate", help="Run benchmark evaluation suite")
+    eval_parser.add_argument("--dataset", type=str, default="rsvqa", choices=["rsvqa", "vrsbench", "cdvqa", "bigearthnet"], help="Benchmark dataset")
 
     args = parser.parse_args()
     if not args.command:
@@ -58,6 +65,9 @@ def cli_main():
 
     if args.command == "health":
         print(json.dumps({"status": "HEALTHY", "version": "v3.0.0", "capabilities": registry.get_capabilities()}, indent=2))
+
+    elif args.command == "capabilities":
+        print(json.dumps(registry.get_capabilities(), indent=2))
 
     elif args.command == "models":
         print("Registered Remote Sensing Models:")
@@ -102,6 +112,11 @@ def cli_main():
             "base_checkpoint": "Qwen/Qwen2-VL-2B-Instruct",
             "active_checkpoint": "MOCK / ZERO-SHOT UNTIL PEFT ADAPTER LOADED",
         }, indent=2))
+
+    elif args.command == "evaluate":
+        from training.evaluate import run_evaluation
+        metrics = run_evaluation(dataset_name=args.dataset)
+        print(json.dumps(metrics, indent=2))
 
 
 if __name__ == "__main__":

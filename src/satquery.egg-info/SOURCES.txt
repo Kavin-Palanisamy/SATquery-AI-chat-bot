@@ -74,9 +74,15 @@ src/satquery/vqa/registry.py
 tests/test_agent_router.py
 tests/test_api.py
 tests/test_change.py
+tests/test_cli.py
 tests/test_crossmodal.py
+tests/test_detection.py
 tests/test_frontend_html.py
 tests/test_grounding.py
 tests/test_image_loader.py
+tests/test_input_validation.py
 tests/test_live_samples.py
+tests/test_models_registry.py
+tests/test_segmentation.py
 tests/test_vqa.py
+tests/test_vqa_v3_acceptance.py
