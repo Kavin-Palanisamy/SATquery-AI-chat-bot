@@ -1,6 +1,7 @@
 import base64
 import io
-from typing import Dict, Optional, Tuple
+from pathlib import Path
+from typing import Dict, Optional, Tuple, Union
 import numpy as np
 from PIL import Image
 
@@ -10,8 +11,8 @@ logger = get_logger("satquery.analysis.change")
 
 
 def generate_change_map(
-    img1: Image.Image,
-    img2: Image.Image,
+    img1: Union[str, Path, Image.Image],
+    img2: Union[str, Path, Image.Image],
 ) -> Tuple[np.ndarray, str]:
     """
     Computes bi-temporal difference map between two timestamps (T1 and T2).
@@ -20,9 +21,15 @@ def generate_change_map(
     - Blue: Water inundation / flood expansion
     - Green: Vegetation growth / greening
     """
+    if isinstance(img1, (str, Path)):
+        img1 = Image.open(img1)
+    if isinstance(img2, (str, Path)):
+        img2 = Image.open(img2)
+
     # Resize to matching dimensions if needed
     if img1.size != img2.size:
         img2 = img2.resize(img1.size, Image.Resampling.BILINEAR)
+
 
     arr1 = np.array(img1.convert("RGB")).astype(np.float32)
     arr2 = np.array(img2.convert("RGB")).astype(np.float32)
@@ -60,8 +67,8 @@ def generate_change_map(
 
 
 def analyze_bitemporal_change(
-    img_t1: Image.Image,
-    img_t2: Image.Image,
+    img_t1: Union[str, Path, Image.Image],
+    img_t2: Union[str, Path, Image.Image],
     query: str,
     meta_t1: Optional[Dict] = None,
     meta_t2: Optional[Dict] = None,
@@ -70,7 +77,13 @@ def analyze_bitemporal_change(
     Performs Bi-temporal change analysis and CDVQA (Change Detection Visual Question Answering).
     Returns (answer_text, change_map_url, confidence).
     """
+    if isinstance(img_t1, (str, Path)):
+        img_t1 = Image.open(img_t1)
+    if isinstance(img_t2, (str, Path)):
+        img_t2 = Image.open(img_t2)
+
     diff_magnitude, change_map_url = generate_change_map(img_t1, img_t2)
+
     
     total_pixels = diff_magnitude.size
     changed_pixels = np.sum(diff_magnitude > 25.0)

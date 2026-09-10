@@ -215,3 +215,14 @@ def load_image(image_path: Union[str, Path]) -> GeoImage:
             )
     except Exception as e:
         raise CorruptedImageError(f"Image could not be read: {e}")
+
+
+def pil_to_base64_png(img: Image.Image) -> str:
+    """Encodes a PIL Image into a base64 data URI string."""
+    import base64
+    import io
+    buffered = io.BytesIO()
+    img.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    return f"data:image/png;base64,{img_str}"
+

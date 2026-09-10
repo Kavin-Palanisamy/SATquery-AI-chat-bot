@@ -75,23 +75,8 @@ class VQAResponse(BaseModel):
     task_type: Optional[str] = Field("vqa", description="Identified remote sensing task type")
 
 
-class EvidenceType(str, Enum):
-    SEMANTIC = "semantic"
-    SPATIAL = "spatial"
-    TEMPORAL = "temporal"
-    CROSS_MODAL = "cross_modal"
+from satquery.schemas.evidence import EvidenceItem, EvidenceType
 
-
-class EvidenceItem(BaseModel):
-    """Structured evidence item supporting evidence-aware VQA."""
-    type: EvidenceType = Field(..., description="Evidence category (semantic, spatial, temporal, cross_modal)")
-    source: str = Field(..., description="Tool or model that generated this evidence (e.g., RS-SpectralHeuristic-Grounder-v1)")
-    target: Optional[str] = Field(None, description="Identified entity or feature class")
-    bbox: Optional[Dict[str, Any]] = Field(None, description="Spatial coordinates if applicable")
-    mask_coverage_pct: Optional[float] = Field(None, description="Measured pixel coverage percentage")
-    bbox_coverage_pct: Optional[float] = Field(None, description="Bounding box coverage percentage")
-    confidence: Optional[float] = Field(None, description="Confidence associated with this specific evidence item")
-    description: str = Field(..., description="Human-auditable explanation of the verified evidence")
 
 
 class VQAModelInfo(BaseModel):

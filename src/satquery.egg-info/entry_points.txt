@@ -1,0 +1,2 @@
+[console_scripts]
+satquery = satquery.cli.main:cli_main

@@ -1,0 +1,42 @@
+model:
+  base_model: "Qwen/Qwen2-VL-2B-Instruct"
+  torch_dtype: "bfloat16"
+  device_map: "auto"
+
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+training:
+  output_dir: "models/qwen2_vl_rs_lora"
+  num_train_epochs: 3
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 2.0e-4
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  logging_steps: 10
+  save_strategy: "epoch"
+  evaluation_strategy: "epoch"
+  save_total_limit: 2
+  bf16: true
+  fp16: false
+  dataloader_num_workers: 4
+
+dataset:
+  train_manifest: "data/training/bigearthnet_train.jsonl"
+  val_manifest: "data/training/bigearthnet_val.jsonl"
+  max_pixels: 1048576  # 1024x1024
+  min_pixels: 65536    # 256x256

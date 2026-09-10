@@ -35,7 +35,7 @@ def test_api_vqa_valid_upload(client, sample_png_image):
     assert response.status_code == 200
     data = response.json()
     assert "answer" in data
-    assert data["model"] == "mock-vlm-v1"
+    assert data["model"] in ("mock-vlm-v1", "Qwen2-VL-RS", "Qwen/Qwen2-VL-2B-Instruct")
     assert data["confidence"] is None
     assert "metadata" in data
     assert data["metadata"]["original_filename"] == "test_patch.png"

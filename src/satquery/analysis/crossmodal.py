@@ -1,4 +1,5 @@
-from typing import Dict, Optional, Tuple
+from pathlib import Path
+from typing import Dict, Optional, Tuple, Union
 import numpy as np
 from PIL import Image
 
@@ -8,8 +9,8 @@ logger = get_logger("satquery.analysis.crossmodal")
 
 
 def analyze_optical_sar_pair(
-    optical_img: Image.Image,
-    sar_img: Image.Image,
+    optical_img: Union[str, Path, Image.Image],
+    sar_img: Union[str, Path, Image.Image],
     query: str,
     optical_meta: Optional[Dict] = None,
     sar_meta: Optional[Dict] = None,
@@ -18,8 +19,14 @@ def analyze_optical_sar_pair(
     Performs joint cross-modal reasoning over co-registered Optical + SAR image pairs.
     Combines optical spectral reflectance with SAR microwave polarimetric backscatter.
     """
+    if isinstance(optical_img, (str, Path)):
+        optical_img = Image.open(optical_img)
+    if isinstance(sar_img, (str, Path)):
+        sar_img = Image.open(sar_img)
+
     if optical_img.size != sar_img.size:
         sar_img = sar_img.resize(optical_img.size, Image.Resampling.BILINEAR)
+
 
     opt_np = np.array(optical_img.convert("RGB")).astype(np.float32)
     sar_np = np.array(sar_img.convert("L")).astype(np.float32)

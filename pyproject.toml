@@ -23,5 +23,9 @@ dependencies = [
     "requests>=2.31.0"
 ]
 
+[project.scripts]
+satquery = "satquery.cli.main:cli_main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
