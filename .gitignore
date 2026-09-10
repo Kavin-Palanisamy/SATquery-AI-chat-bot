@@ -1,0 +1,32 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# secrets
+.env
+
+# Data
+data/raw/
+data/processed/
+BigEarthNet.txt/
+
+# Large files
+models/
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+
+# Outputs / temporary files
+outputs/*
+!outputs/.gitkeep
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / IDE
+.vscode/
+.DS_Store
+Thumbs.db
+.pytest_cache/

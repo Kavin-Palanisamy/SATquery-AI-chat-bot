@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SatQuery.ai — Simple AI Assistant for Satellite Imagery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- Three.js Celestial Sky Background -->
+  <canvas id="sky"></canvas>
+
+  <div class="content">
+
+    <!-- Fixed Header with Active Route Navigation -->
+    <header>
+      <div class="header-left">
+        <a href="/overview" class="logo nav-link" data-route="overview">
+          <span class="logo-mark">🛰️</span>
+          SatQuery<span>.ai</span>
+        </a>
+        <div class="system-status" id="systemStatus" title="Model Status">
+          <span class="status-dot"></span>
+          <span id="modelBadge">Ready</span>
+        </div>
+      </div>
+      <nav id="mainNav">
+        <a href="/overview" class="nav-link active" data-route="overview">Overview</a>
+        <a href="/vqa" class="nav-link" data-route="vqa">Ask Questions</a>
+        <a href="/grounding" class="nav-link" data-route="grounding">Find Objects</a>
+        <a href="/change" class="nav-link" data-route="change">Before &amp; After</a>
+        <a href="/fusion" class="nav-link" data-route="fusion">See Through Clouds</a>
+        <a href="/provenance" class="nav-link" data-route="provenance">History Log</a>
+      </nav>
+      <a class="cta nav-link" href="/vqa" data-route="vqa">Try It Now →</a>
+    </header>
+
+    <!-- ====================================================================
+         VIEW 1: MISSION OVERVIEW (/overview or /)
+         ==================================================================== -->
+    <div id="viewOverview" class="app-view">
+      <!-- Hero Section -->
+      <main class="hero">
+        <div class="eyebrow">
+          <span class="dot"></span>
+          AI Assistant for Satellite Imagery • SIH26167
+        </div>
+        <h1>Ask your satellite images anything.<br>Get <em>clear answers</em> in seconds.</h1>
+        <p class="lede">SatQuery understands raw satellite files, spots changes over time, and finds specific objects on the ground — no complicated GIS tools needed.</p>
+
+        <div class="hero-actions">
+          <a href="/vqa" class="cta-large nav-link" data-route="vqa">Ask a Question ↓</a>
+          <a href="/grounding" class="btn-ghost nav-link" data-route="grounding">Find Objects →</a>
+          <a href="/change" class="btn-ghost nav-link" data-route="change">Before &amp; After →</a>
+          <a href="/fusion" class="btn-ghost nav-link" data-route="fusion">See Through Clouds →</a>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <span class="bracket tl"></span><span class="bracket br"></span>
+            <div class="idx">01</div>
+            <div class="num">4 Key Features</div>
+            <div class="lbl">Q&amp;A, Finding Objects, Before/After Changes, and Seeing Through Clouds</div>
+          </div>
+          <div class="stat">
+            <span class="bracket tl"></span><span class="bracket br"></span>
+            <div class="idx">02</div>
+            <div class="num">Any Satellite File</div>
+            <div class="lbl">Reads standard images, GeoTIFFs, and radar files automatically</div>
+          </div>
+          <div class="stat">
+            <span class="bracket tl"></span><span class="bracket br"></span>
+            <div class="idx">03</div>
+            <div class="num">100% Clear Proof</div>
+            <div class="lbl">Shows how it reached every answer with transparent step-by-step logs</div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Benchmark Datasets Section -->
+      <section class="panel-section" id="benchmarks">
+        <div class="panel">
+          <div>
+            <div class="eyebrow small"><span class="dot"></span> Real Satellite Data</div>
+            <h2>Tested on Real Satellite Datasets</h2>
+            <p>SatQuery works on open satellite data from ISRO, European Space Agency (Sentinel), and NASA (Landsat).</p>
+          </div>
+          <div class="mini-stats">
+            <div><div class="n">Sentinel &amp; Landsat</div><div class="l">Real 16-bit satellite images with true map coordinates</div></div>
+            <div><div class="n">Object Benchmark</div><div class="l">Trained to locate ships, planes, buildings, and water bodies</div></div>
+            <div><div class="n">Disaster &amp; Flood</div><div class="l">Compares images before and after floods or construction</div></div>
+            <div><div class="n">Radar Backscatter</div><div class="l">Penetrates thick clouds using microwave radar passes</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Architecture Pipeline Flow -->
+      <section class="panel-section" id="pipeline">
+        <div class="panel">
+          <div>
+            <div class="eyebrow small"><span class="dot"></span> How It Works</div>
+            <h2>Simple 3-Step Process</h2>
+            <p>From your uploaded satellite picture to a clear, verified answer in plain English.</p>
+          </div>
+          <div class="pipeline-steps">
+            <div class="pipe-step">
+              <div class="step-num">01</div>
+              <div class="step-info">
+                <h4>1. Read &amp; Enhance Image</h4>
+                <p>Loads map coordinates, balances contrast, and prepares the image for AI viewing.</p>
+              </div>
+            </div>
+            <div class="pipe-step">
+              <div class="step-num">02</div>
+              <div class="step-info">
+                <h4>2. Understand Your Question</h4>
+                <p>The AI figures out what you need and picks the right tool to inspect the image.</p>
+              </div>
+            </div>
+            <div class="pipe-step">
+              <div class="step-num">03</div>
+              <div class="step-info">
+                <h4>3. Show Answer with Visual Proof</h4>
+                <p>Draws glowing boxes on targets, highlights changes, and writes an easy-to-read explanation.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+
+    <!-- ====================================================================
+         VIEW 2: DEDICATED INTERACTIVE WORKSPACE (/vqa, /grounding, /change, /fusion)
+         ==================================================================== -->
+    <div id="viewWorkspace" class="app-view hidden">
+      <section class="section-container" id="console">
+        <div class="section-header">
+          <div class="eyebrow small"><span class="dot"></span> <span id="workspaceBadge">Studio</span></div>
+          <h2 id="workspaceTitle">Satellite Workspace</h2>
+          <p id="workspaceSubtitle">Upload satellite images, ask your question, and get instant answers.</p>
+        </div>
+
+        <div class="workspace-grid">
+          <!-- Left Panel: Input & Controls -->
+          <div class="card bracket-card">
+            <span class="bracket tl"></span><span class="bracket br"></span>
+            <div class="card-badge">Step 1</div>
+            <h3 id="panelTitle">Upload Image</h3>
+            <p class="card-sub" id="panelSubtitle">Select your satellite file or sample.</p>
+
+            <form id="vqaForm">
+              <!-- Primary Image Upload -->
+              <div class="form-group">
+                <label for="imageInput" id="labelPrimaryImage">Main Satellite Image (GeoTIFF, PNG, JPEG)</label>
+                <div class="drop-zone" id="dropZone">
+                  <div class="drop-icon">🛰️</div>
+                  <p class="drop-text" id="dropTextPrimary">Click or drag &amp; drop satellite image</p>
+                  <span class="drop-hint">Supports GeoTIFF, TIFF, PNG, and JPEG</span>
+                  <input type="file" id="imageInput" name="image" accept=".tif,.tiff,.png,.jpg,.jpeg" required>
+                </div>
+                <div id="fileInfo" class="file-info hidden">
+                  <div class="file-details">
+                    <span class="file-icon">📄</span>
+                    <span class="file-name" id="fileName">No file selected</span>
+                  </div>
+                  <button type="button" class="btn-clear" id="btnClearFile" title="Remove file">✕</button>
+                </div>
+              </div>
+
+              <!-- Secondary Image Upload (Visible in Change and Radar modes) -->
+              <div class="form-group hidden" id="secondaryGroup">
+                <label for="secondaryImageInput" id="labelSecondaryImage">Second Image (After Date or Radar)</label>
+                <div class="drop-zone" id="dropZone2">
+                  <div class="drop-icon">📡</div>
+                  <p class="drop-text" id="dropTextSecondary">Click or drag &amp; drop second image</p>
+                  <span class="drop-hint">Image of the same area for comparison</span>
+                  <input type="file" id="secondaryImageInput" name="secondary_image" accept=".tif,.tiff,.png,.jpg,.jpeg">
+                </div>
+                <div id="fileInfo2" class="file-info hidden">
+                  <div class="file-details">
+                    <span class="file-icon">📄</span>
+                    <span class="file-name" id="fileName2">No file selected</span>
+                  </div>
+                  <button type="button" class="btn-clear" id="btnClearFile2" title="Remove file">✕</button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="questionInput">Your Question in Plain English</label>
+                <div class="input-wrapper">
+                  <input 
+                    type="text" 
+                    id="questionInput" 
+                    name="question" 
+                    placeholder="e.g. What is in this image?" 
+                    required 
+                    autocomplete="off"
+                  >
+                </div>
+                <div class="quick-questions" id="quickQuestions">
+                  <span class="quick-title">Quick Examples:</span>
+                  <!-- Populated dynamically per route -->
+                </div>
+              </div>
+
+              <button type="submit" id="btnAnalyse" class="btn-primary">
+                <span class="btn-text">Get Answer</span>
+                <span class="spinner hidden" id="spinner"></span>
+              </button>
+            </form>
+
+            <div id="alertBox" class="alert-box hidden"></div>
+          </div>
+
+          <!-- Right Panel: Image Preview & Details -->
+          <div class="card bracket-card">
+            <span class="bracket tl"></span><span class="bracket br"></span>
+            <div class="card-badge">Step 2</div>
+            <h3>Image Preview &amp; Highlights</h3>
+            <p class="card-sub">See your image preview with highlighted boxes and change maps.</p>
+
+            <div class="image-preview-wrapper" id="previewWrapper">
+              <div class="preview-placeholder" id="previewPlaceholder">
+                <div class="placeholder-icon">🔭</div>
+                <span>Upload an image to see the preview here</span>
+              </div>
+              <div class="preview-canvas-container" id="canvasContainer">
+                <img id="imagePreview" class="image-preview hidden" alt="Satellite Preview">
+                <img id="changeOverlay" class="change-overlay hidden" alt="Change Overlay">
+                <canvas id="groundingCanvas" class="grounding-canvas hidden"></canvas>
+              </div>
+            </div>
+
+            <!-- Layer toggles -->
+            <div class="layer-controls hidden" id="layerControls">
+              <label class="layer-toggle">
+                <input type="checkbox" id="toggleGrounding" checked>
+                <span>Show Highlight Boxes</span>
+              </label>
+              <label class="layer-toggle hidden" id="toggleChangeLayer">
+                <input type="checkbox" id="toggleChange" checked>
+                <span>Show Change Map</span>
+              </label>
+            </div>
+
+            <!-- Image Details Drawer -->
+            <div class="metadata-container">
+              <div class="meta-header">
+                <span class="meta-title">Image Details</span>
+                <span class="meta-badge">Map Coordinates</span>
+              </div>
+              <div class="meta-grid" id="metadataGrid">
+                <div class="meta-item">
+                  <span class="meta-lbl">Map System (CRS)</span>
+                  <span class="meta-val" id="metaCrs">—</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-lbl">Dimensions [H, W]</span>
+                  <span class="meta-val" id="metaShape">—</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-lbl">Color Layers</span>
+                  <span class="meta-val" id="metaBands">—</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-lbl">File Type</span>
+                  <span class="meta-val" id="metaDriver">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Output Panel: Results & Explanation -->
+        <div class="card bracket-card results-card" id="resultsSection">
+          <span class="bracket tl"></span><span class="bracket br"></span>
+          <div class="results-header-bar">
+            <div class="card-badge">Step 3</div>
+            <div class="result-tags">
+              <span class="meta-tag">Selected Task: <strong id="resTask">VQA</strong></span>
+              <span class="meta-tag">Tool: <strong id="resTool">—</strong></span>
+              <span class="meta-tag">Model: <strong id="resModel">—</strong></span>
+              <span class="meta-tag">Mode: <strong id="resMode">—</strong></span>
+              <span class="meta-tag">RS Adaptation: <strong id="resAdaptation">NOT LOADED</strong></span>
+              <span class="meta-tag">Evidence: <strong id="resEvidence">NONE</strong></span>
+              <span class="meta-tag">Input: <strong id="resInput">—</strong></span>
+              <span class="meta-tag">Speed: <strong id="resLatency">—</strong></span>
+              <span class="meta-tag">Confidence: <strong id="resConfidence">—</strong></span>
+            </div>
+          </div>
+          
+          <div id="routingReasonBanner" class="routing-reason-banner hidden">
+            <span class="routing-badge">Routing Decision</span>
+            <span id="routingReasonText" class="routing-text">—</span>
+          </div>
+
+          <div class="result-content">
+            <h4>Answer:</h4>
+            <p id="resAnswer" class="answer-text">Upload your image above and click "Get Answer".</p>
+
+            <!-- Agent Trace Timeline -->
+            <div class="agent-trace-container hidden" id="agentTraceContainer">
+              <div class="trace-title">How the AI solved this step-by-step:</div>
+              <div class="trace-steps" id="traceSteps"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+
+    <!-- ====================================================================
+         VIEW 3: HISTORY & AUDIT LOG (/provenance)
+         ==================================================================== -->
+    <div id="viewProvenance" class="app-view hidden">
+      <section class="section-container" id="provenanceSection">
+        <div class="section-header">
+          <div class="eyebrow small"><span class="dot"></span> Full History</div>
+          <h2>Activity &amp; History Log</h2>
+          <p>Every query you run is saved here with its question, answer, speed, and time.</p>
+        </div>
+
+        <div class="card bracket-card prov-fullscreen-card">
+          <span class="bracket tl"></span><span class="bracket br"></span>
+          <div class="prov-header">
+            <div class="prov-title-wrap">
+              <span class="prov-dot"></span>
+              <span class="prov-title">Recent Activity Log</span>
+            </div>
+            <div class="prov-actions">
+              <button type="button" id="btnExportJson" class="btn-text-link">⬇ Save as JSON</button>
+              <button type="button" id="btnRefreshProv" class="btn-text-link">↻ Refresh</button>
+            </div>
+          </div>
+          <div class="prov-feed-fullscreen" id="provenanceFeedFull">
+            <div class="prov-empty">No queries run yet. Pick a feature above to get started!</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <div class="footer-content">
+        <div class="footer-brand">
+          <div class="logo">SatQuery<span>.ai</span></div>
+          <p>Easy AI assistant for satellite imagery • Team Saverra (IIT Madras BS)</p>
+        </div>
+        <div class="footer-meta">
+          <span>SIH26167 • Space Technology</span>
+          <span>FastAPI • PyTorch • GDAL • Qwen2-VL</span>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Three.js Library -->
+  <script src="/static/three.min.js"></script>
+  <script>
+    if (typeof THREE === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+    }
+  </script>
+
+  <!-- Application Logic & Router -->
+  <script src="/static/app.js"></script>
+</body>
+</html>

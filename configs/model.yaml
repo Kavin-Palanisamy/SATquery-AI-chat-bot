@@ -1,0 +1,80 @@
+# SatQuery AI — Model Configuration Matrix
+# Problem Statement: SIH26167 (Remote Sensing Visual Question Answering)
+
+selected_model: "Qwen/Qwen2-VL-2B-Instruct"
+
+# Candidate Models Evaluation
+candidates:
+  - id: "Qwen/Qwen2-VL-2B-Instruct"
+    name: "Qwen2-VL 2B Instruct"
+    source: "Hugging Face (Qwen/Qwen2-VL-2B-Instruct)"
+    architecture: "Qwen2VLForConditionalGeneration"
+    parameters: "2.2 Billion"
+    vram_fp16: "4.5 GB"
+    vram_4bit: "2.2 GB"
+    license: "Apache 2.0"
+    inference_speed: "Fast (~0.8s - 1.5s on GPU)"
+    hf_available: true
+    fine_tuning_suitability: "High (LoRA / QLoRA with PEFT)"
+    suitability_for_rs: "High (Dynamic resolution Native NaViT architecture, robust multi-scale scene reasoning)"
+    selection_reason: "Selected as primary VLM for Prototype 1 due to low VRAM footprint (<5GB), native high-resolution spatial reasoning suitable for satellite imagery, Apache 2.0 open-source license, and direct Hugging Face transformers integration."
+
+  - id: "vikhyatk/moondream2"
+    name: "Moondream 2"
+    source: "Hugging Face (vikhyatk/moondream2)"
+    architecture: "Custom (MoondreamForConditionalGeneration / SigLIP + Phi-1.5)"
+    parameters: "1.86 Billion"
+    vram_fp16: "3.5 GB"
+    vram_4bit: "1.8 GB"
+    license: "Apache 2.0"
+    inference_speed: "Very Fast (~0.5s - 1.0s on GPU, viable on CPU)"
+    hf_available: true
+    fine_tuning_suitability: "Medium (Custom architecture)"
+    suitability_for_rs: "Moderate (Good lightweight general vision-language capabilities, fast inference on edge/CPU)"
+    selection_reason: "Configured as lightweight edge/CPU fallback if GPU VRAM is restricted."
+
+  - id: "MBZUAI/geochat-7B"
+    name: "GeoChat 7B"
+    source: "Hugging Face (MBZUAI/geochat-7B)"
+    architecture: "LLaVA-1.5 fine-tuned for Remote Sensing"
+    parameters: "7.0 Billion"
+    vram_fp16: "14.0 GB"
+    vram_4bit: "5.5 GB"
+    license: "Non-commercial / LLaMA-2 based"
+    inference_speed: "Moderate (~2.5s - 4.5s)"
+    hf_available: true
+    fine_tuning_suitability: "High"
+    suitability_for_rs: "Very High (Trained explicitly on remote sensing imagery and region grounding)"
+    selection_reason: "Evaluated as domain-specialist RS model; deferred to later stages due to VRAM requirements (>6GB without 4-bit) and LLaVA custom wrapper overhead."
+
+# Runtime Fallback Behavior
+runtime:
+  prefer_device: "auto" # 'cuda', 'cpu', or 'auto'
+  torch_dtype: "float16" # 'float16' for GPU, 'float32' for CPU
+  enable_mock_fallback: true # Allows testing and CI without downloading weights
+  max_new_tokens: 256
+  temperature: 0.2
+
+# Task Registry Matrix
+task_registry:
+  vqa:
+    tool: "RemoteSensingVQATool"
+    default_model: "Qwen/Qwen2-VL-2B-Instruct"
+    mock_model: "MockVQAModel"
+    description: "Single-Image Visual Question Answering & Land-Cover Scene Understanding"
+  grounding:
+    tool: "RemoteSensingGroundingTool"
+    default_model: "RS-Grounding-Engine"
+    mock_model: "MockGroundingEngine"
+    description: "Visual Grounding & Spatial Feature Bounding Box Localization"
+  bitemporal_change:
+    tool: "RemoteSensingChangeTool"
+    default_model: "CDVQA-Difference-Engine"
+    mock_model: "MockCDVQAEngine"
+    description: "Bi-Temporal Surface Change Detection & Quantified CDVQA"
+  optical_sar_fusion:
+    tool: "OpticalSARFusionTool"
+    default_model: "Multimodal-Radar-Optical-Engine"
+    mock_model: "MockCrossModalEngine"
+    description: "Optical + SAR Polarimetric Radar Cross-Modal Fusion"
+

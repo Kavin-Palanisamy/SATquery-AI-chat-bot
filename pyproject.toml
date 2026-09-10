@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "satquery"
+version = "0.1.0"
+description = "SatQuery AI: Vision-Language Assistant for Multimodal Remote Sensing Image Analysis"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Team Saverra", email = "amityush@example.com" }
+]
+dependencies = [
+    "rasterio>=1.3.8",
+    "numpy>=1.24.0,<2.0.0",
+    "pillow>=10.0.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "pydantic>=2.5.0",
+    "pyyaml>=6.0.1",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

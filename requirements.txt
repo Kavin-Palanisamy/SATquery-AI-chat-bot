@@ -1,0 +1,27 @@
+# Core Geospatial & Imaging
+rasterio>=1.3.8
+numpy>=1.24.0,<2.0.0
+pillow>=10.0.0
+
+# Deep Learning & Vision-Language Models
+torch>=2.1.0
+torchvision>=0.16.0
+transformers>=4.45.0
+accelerate>=0.26.0
+
+# API & Web Interface
+fastapi>=0.110.0
+uvicorn>=0.28.0
+python-multipart>=0.0.9
+pydantic>=2.5.0
+
+# Utilities & Config
+pyyaml>=6.0.1
+python-dotenv>=1.0.0
+requests>=2.31.0
+
+# Testing & Notebooks
+pytest>=8.0.0
+httpx>=0.27.0
+ipykernel>=6.29.0
+matplotlib>=3.8.0
