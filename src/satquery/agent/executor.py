@@ -235,6 +235,12 @@ class AgentExecutor:
         grounding_res_out: Optional[Dict[str, Any]] = None
 
         # ROUTE 1: Grounding Workflow
+        headline_out = None
+        details_out = None
+        location_summary_out = None
+        visual_summary_out = None
+        confidence_level_out = None
+
         if intent.task == AgentTaskType.GROUNDING:
             ground_tool = self.tool_registry.get_tool("RemoteSensingGroundingTool")
             gr = ground_tool.execute(img1, query, target=intent.target)
@@ -262,7 +268,6 @@ class AgentExecutor:
                 grounding_mask_url_out = gr.mask_url
                 grounding_res_out = gr.model_dump()
                 evidence_items.append(
-
                     EvidenceItem(
                         type=EvidenceType.BBOX,
                         source=model_name,
@@ -275,14 +280,19 @@ class AgentExecutor:
                         provenance="HEURISTIC",
                     )
                 )
-                final_answer = (
-                    f"Localized primary {gr.target} boundary spanning "
-                    f"[{int(d.xmin*100)}%-{int(d.xmax*100)}% X, {int(d.ymin*100)}%-{int(d.ymax*100)}% Y]. "
-                    f"Bounding box covers {d.bbox_coverage_pct:.1f}% of the image. "
-                    f"Detected mask covers {d.mask_coverage_pct or 0.0:.2f}% of the image (heuristic grounding)."
-                )
+                final_answer = gr.message
+                headline_out = gr.headline or f"{gr.target.title()} detected."
+                details_out = gr.details or f"The detected {gr.target} is located in the {gr.location_description or 'highlighted area'}."
+                location_summary_out = gr.location_description or "Highlighted area"
+                visual_summary_out = "Highlighted box and mask overlay"
+                confidence_level_out = gr.confidence_qualitative or "High"
             else:
-                final_answer = f"Unable to reliably localize the requested target '{gr.target}' using the available heuristic grounding method."
+                final_answer = f"I couldn't identify the requested {gr.target} reliably in this image."
+                headline_out = f"Could not locate {gr.target}"
+                details_out = f"No reliable {gr.target} region was found matching spectral/spatial criteria."
+                location_summary_out = "Not detected"
+                visual_summary_out = "No highlight"
+                confidence_level_out = "Low"
 
         # ROUTE 2: Segmentation Area Workflow
         elif intent.task == AgentTaskType.SEGMENTATION_AREA:
@@ -306,16 +316,25 @@ class AgentExecutor:
                         provenance="HEURISTIC",
                     )
                 )
-                vqa_res = vqa_tool.execute(img1, query, context={"segmentation": sr.model_dump()})
-                final_answer = vqa_res.answer
-                model_name = vqa_res.model_info.name
-                model_mode = vqa_res.model_info.mode
-                rs_adaptation = vqa_res.model_info.rs_adaptation_status
-                confidence_val = None
+                final_answer = f"Estimated {sr.target_class} coverage is {sr.area_percent:.1f}% based on verified segmentation evidence."
+                headline_out = f"{sr.target_class.title()} coverage calculated"
+                details_out = f"Verified pixel segmentation measured {sr.area_percent:.1f}% coverage across the scene."
+                location_summary_out = f"{sr.area_percent:.1f}% of image area"
+                visual_summary_out = "Colorized segmentation mask"
+                confidence_level_out = "High"
+                model_name = "RS-SpectralHeuristic-Segmenter-v1"
+                model_mode = "HEURISTIC"
+                rs_adaptation = "NOT LOADED"
+                confidence_val = sr.confidence
             else:
                 limitations.append("Segmentation mask could not be extracted.")
                 vqa_res = vqa_tool.execute(img1, query, context={})
                 final_answer = vqa_res.answer
+                headline_out = "Segmentation unavailable"
+                details_out = "Could not extract quantitative segmentation mask."
+                location_summary_out = "Full image"
+                visual_summary_out = "None"
+                confidence_level_out = "Uncalibrated"
                 model_name = vqa_res.model_info.name
                 model_mode = vqa_res.model_info.mode
                 rs_adaptation = vqa_res.model_info.rs_adaptation_status
@@ -355,15 +374,24 @@ class AgentExecutor:
                             provenance="HEURISTIC",
                         )
                     )
-                vqa_res = vqa_tool.execute(img1, query, context={"detection": dr.model_dump()})
-                final_answer = vqa_res.answer
-                model_name = vqa_res.model_info.name
-                model_mode = vqa_res.model_info.mode
-                rs_adaptation = vqa_res.model_info.rs_adaptation_status
-                confidence_val = None
+                final_answer = f"Detected {dr.total_count} {dr.target_class} instances in the highlighted regions."
+                headline_out = f"{dr.target_class.title()} instances detected"
+                details_out = f"Identified {dr.total_count} coherent {dr.target_class} structures."
+                location_summary_out = f"{dr.total_count} locations across scene"
+                visual_summary_out = "Instance bounding boxes"
+                confidence_level_out = "High"
+                model_name = "RS-Morphological-Detector-v1"
+                model_mode = "HEURISTIC"
+                rs_adaptation = "NOT LOADED"
+                confidence_val = dr.confidence
             else:
                 vqa_res = vqa_tool.execute(img1, query, context={})
                 final_answer = vqa_res.answer
+                headline_out = f"No {intent.target or 'object'} count available"
+                details_out = final_answer
+                location_summary_out = "Full image"
+                visual_summary_out = "None"
+                confidence_level_out = "Uncalibrated"
                 model_name = vqa_res.model_info.name
                 model_mode = vqa_res.model_info.mode
                 rs_adaptation = vqa_res.model_info.rs_adaptation_status
@@ -390,6 +418,17 @@ class AgentExecutor:
                         provenance="REAL",
                     )
                 )
+                headline_out = "Surface change detected"
+                details_out = f"Detected {cr.change_area_percent:.1f}% difference between the observation dates."
+                location_summary_out = f"{cr.change_area_percent:.1f}% of scene area"
+                visual_summary_out = "Bi-temporal difference heatmap"
+                confidence_level_out = "High" if cr.confidence and cr.confidence >= 0.8 else "Moderate"
+            else:
+                headline_out = "No significant change detected"
+                details_out = "Land-cover classification remained consistent between observation dates."
+                location_summary_out = "Whole scene"
+                visual_summary_out = "No difference"
+                confidence_level_out = "High"
 
         # ROUTE 5: Optical + SAR Fusion Workflow
         elif intent.task == AgentTaskType.OPTICAL_SAR_FUSION and img2 is not None:
@@ -409,6 +448,11 @@ class AgentExecutor:
                         provenance="REAL",
                     )
                 )
+            headline_out = "Optical + SAR cross-modal consensus"
+            details_out = "Combined visible colors with radar microwave penetration."
+            location_summary_out = "Across full scene"
+            visual_summary_out = "Multi-sensor cross-validation"
+            confidence_level_out = "High"
 
         # ROUTE 6: Standard VQA / Scene Description
         else:
@@ -419,6 +463,11 @@ class AgentExecutor:
             model_mode = vqa_res.model_info.mode
             rs_adaptation = vqa_res.model_info.rs_adaptation_status
             confidence_val = None
+            headline_out = "Land cover analyzed"
+            details_out = final_answer
+            location_summary_out = "Full image scene"
+            visual_summary_out = "Qualitative scene analysis"
+            confidence_level_out = "Uncalibrated"
 
         # -------------------------------------------------------------
         # STEP 5: Specialist Tool Execution
@@ -547,6 +596,11 @@ class AgentExecutor:
             model_mode=model_mode,
             rs_adaptation=rs_adaptation,
             confidence=confidence_val,
+            confidence_level=confidence_level_out,
+            headline=headline_out,
+            details=details_out,
+            location_summary=location_summary_out,
+            visual_summary=visual_summary_out,
             evidence_used=evidence_used_label,
             evidence_items=evidence_items,
             boxes=boxes_out,

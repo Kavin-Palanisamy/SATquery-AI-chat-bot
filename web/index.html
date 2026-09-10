@@ -279,36 +279,93 @@
         <!-- Output Panel: Results & Explanation -->
         <div class="card bracket-card results-card" id="resultsSection">
           <span class="bracket tl"></span><span class="bracket br"></span>
+          
           <div class="results-header-bar">
             <div class="card-badge">Step 3</div>
-            <div class="result-tags">
-              <span class="meta-tag">Selected Task: <strong id="resTask">VQA</strong></span>
-              <span class="meta-tag">Tool: <strong id="resTool">—</strong></span>
-              <span class="meta-tag">Model: <strong id="resModel">—</strong></span>
-              <span class="meta-tag">Mode: <strong id="resMode">—</strong></span>
-              <span class="meta-tag">RS Adaptation: <strong id="resAdaptation">NOT LOADED</strong></span>
-              <span class="meta-tag">Evidence: <strong id="resEvidence">NONE</strong></span>
-              <span class="meta-tag">Input: <strong id="resInput">—</strong></span>
-              <span class="meta-tag">Speed: <strong id="resLatency">—</strong></span>
-              <span class="meta-tag">Confidence: <strong id="resConfidence">—</strong></span>
+            <div class="results-main-title">
+              <h3>Analysis Result</h3>
+              <span class="confidence-pill" id="resConfidencePill">Ready</span>
             </div>
           </div>
           
-          <div id="routingReasonBanner" class="routing-reason-banner hidden">
-            <span class="routing-badge">Routing Decision</span>
-            <span id="routingReasonText" class="routing-text">—</span>
-          </div>
+          <!-- User-Friendly Primary Result Display -->
+          <div class="user-friendly-result-box">
+            <div class="primary-answer-display" id="resAnswerDisplay">
+              <div class="answer-lead-icon">🛰️</div>
+              <div class="answer-text-wrap">
+                <div class="answer-headline" id="resHeadline">Ready for analysis</div>
+                <p id="resAnswer" class="answer-text">Upload your image above and click "Get Answer".</p>
+              </div>
+            </div>
 
-          <div class="result-content">
-            <h4>Answer:</h4>
-            <p id="resAnswer" class="answer-text">Upload your image above and click "Get Answer".</p>
+            <!-- 4-Box Key Findings Summary Grid -->
+            <div class="findings-summary-grid" id="findingsGrid">
+              <div class="finding-card">
+                <div class="finding-icon">🔍</div>
+                <div class="finding-meta">
+                  <span class="finding-lbl">What was found</span>
+                  <strong class="finding-val" id="findingWhat">—</strong>
+                </div>
+              </div>
 
-            <!-- Agent Trace Timeline -->
-            <div class="agent-trace-container hidden" id="agentTraceContainer">
-              <div class="trace-title">How the AI solved this step-by-step:</div>
-              <div class="trace-steps" id="traceSteps"></div>
+              <div class="finding-card">
+                <div class="finding-icon">📍</div>
+                <div class="finding-meta">
+                  <span class="finding-lbl">Where</span>
+                  <strong class="finding-val" id="findingWhere">—</strong>
+                </div>
+              </div>
+
+              <div class="finding-card">
+                <div class="finding-icon">🖼️</div>
+                <div class="finding-meta">
+                  <span class="finding-lbl">Visual evidence</span>
+                  <strong class="finding-val" id="findingVisual">—</strong>
+                </div>
+              </div>
+
+              <div class="finding-card">
+                <div class="finding-icon">✨</div>
+                <div class="finding-meta">
+                  <span class="finding-lbl">Confidence</span>
+                  <strong class="finding-val" id="findingConfidence">—</strong>
+                </div>
+              </div>
             </div>
           </div>
+
+          <!-- Secondary/Collapsible Technical Details & Observable Trace -->
+          <details class="tech-audit-details" id="techAuditDetails" open>
+            <summary class="tech-summary-btn">
+              <span>⚙ Specialist Engine &amp; Execution Audit (Technical View)</span>
+              <span class="tech-toggle-icon">▼</span>
+            </summary>
+            
+            <div class="tech-details-body">
+              <div class="result-tags">
+                <span class="meta-tag">Task: <strong id="resTask">VQA</strong></span>
+                <span class="meta-tag">Tool: <strong id="resTool">—</strong></span>
+                <span class="meta-tag">Model: <strong id="resModel">—</strong></span>
+                <span class="meta-tag">Mode: <strong id="resMode">—</strong></span>
+                <span class="meta-tag">RS Adaptation: <strong id="resAdaptation">NOT LOADED</strong></span>
+                <span class="meta-tag">Evidence: <strong id="resEvidence">NONE</strong></span>
+                <span class="meta-tag">Input: <strong id="resInput">—</strong></span>
+                <span class="meta-tag">Speed: <strong id="resLatency">—</strong></span>
+                <span class="meta-tag">Score: <strong id="resConfidence">—</strong></span>
+              </div>
+
+              <div id="routingReasonBanner" class="routing-reason-banner hidden">
+                <span class="routing-badge">Routing Decision</span>
+                <span id="routingReasonText" class="routing-text">—</span>
+              </div>
+
+              <!-- Agent Trace Timeline -->
+              <div class="agent-trace-container hidden" id="agentTraceContainer">
+                <div class="trace-title">Observable Step-by-Step Execution Trace:</div>
+                <div class="trace-steps" id="traceSteps"></div>
+              </div>
+            </div>
+          </details>
         </div>
       </section>
     </div>

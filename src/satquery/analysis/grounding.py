@@ -104,11 +104,52 @@ def pixel_to_percentage_bbox(
     return {
         "x_range": f"{int(round(nx1 * 100))}%–{int(round(nx2 * 100))}%",
         "y_range": f"{int(round(ny1 * 100))}%–{int(round(ny2 * 100))}%",
+        "x_range_ascii": f"{int(round(nx1 * 100))}%-{int(round(nx2 * 100))}%",
+        "y_range_ascii": f"{int(round(ny1 * 100))}%-{int(round(ny2 * 100))}%",
         "xmin_pct": int(round(nx1 * 100)),
         "xmax_pct": int(round(nx2 * 100)),
         "ymin_pct": int(round(ny1 * 100)),
         "ymax_pct": int(round(ny2 * 100)),
     }
+
+
+def get_spatial_location_description(xmin: float, ymin: float, xmax: float, ymax: float) -> str:
+    """
+    Translates normalized bounding coordinates into intuitive natural-language spatial descriptions.
+    Examples: 'central-left area', 'north-western portion', 'southern region', 'central area'.
+    """
+    cx = (xmin + xmax) / 2.0
+    cy = (ymin + ymax) / 2.0
+    w = xmax - xmin
+    h = ymax - ymin
+
+    if w > 0.75 and h > 0.75:
+        return "spanning across most of the image"
+
+    # Vertical position
+    if cy < 0.38:
+        vert = "northern"
+    elif cy > 0.62:
+        vert = "southern"
+    else:
+        vert = "central"
+
+    # Horizontal position
+    if cx < 0.38:
+        horiz = "western / left" if vert != "central" else "central-left"
+    elif cx > 0.62:
+        horiz = "eastern / right" if vert != "central" else "central-right"
+    else:
+        horiz = "central"
+
+    if vert == "central" and horiz == "central":
+        return "central portion of the image"
+    elif vert == "central":
+        return f"{horiz} area"
+    elif horiz == "central":
+        return f"{vert} region"
+    else:
+        return f"{vert}-{horiz.split(' / ')[0]} area"
 
 
 # ============================================================================
@@ -403,11 +444,15 @@ class GroundingResult(BaseModel):
     detections: List[BoundingBox] = Field(default_factory=list)
     success: bool = True
     confidence: Optional[float] = None
+    confidence_qualitative: Optional[str] = "High"
     confidence_type: str = "heuristic"
     model_name: str
     model_type: str  # "HEURISTIC", "MOCK", "REAL"
     is_mock: bool = False
     is_heuristic: bool = True
+    headline: Optional[str] = None
+    details: Optional[str] = None
+    location_description: Optional[str] = None
     message: str
     mask_url: Optional[str] = None
     mask_coverage_pct: Optional[float] = None
@@ -448,11 +493,15 @@ class MockGroundingModel(BaseGroundingModel):
             detections=[],
             success=False,
             confidence=None,
+            confidence_qualitative="Low",
             confidence_type="mock",
             model_name=self.model_id,
             model_type="MOCK",
             is_mock=True,
             is_heuristic=False,
+            headline=f"Could not locate {tgt}",
+            details=f"Mock grounding engine cannot reliably localize '{tgt}' without active detector weights.",
+            location_description=None,
             message=f"Mock grounding engine cannot reliably localize '{tgt}' without active detector weights.",
             raw_details={"reason": "Mock mode does not synthesize false coordinates."},
         )
@@ -490,32 +539,32 @@ class HeuristicGroundingModel(BaseGroundingModel):
         # ---------------------------------------------------------------------
         if "water" in tgt_lower or "lake" in tgt_lower or "river" in tgt_lower or "sea" in tgt_lower or "ocean" in tgt_lower:
             # Water: distinct blue dominance over red, low red reflectance, or dark absorption
-            water_mask = ((b > r + 15) & (b > g - 10) & (r < 115)) | ((b > 90) & (g > 85) & (r < 65))
-            candidate_components = find_connected_regions(water_mask, min_pixels=40, min_area_pct=0.4)
+            water_mask = ((b > r + 12) & (b > g - 12) & (r < 120)) | ((b > 85) & (g > 80) & (r < 65) & (brightness < 170))
+            candidate_components = find_connected_regions(water_mask, min_pixels=35, min_area_pct=0.35)
             label_prefix = "Water Body" if "water" in tgt_lower else tgt.title()
             spectral_contrast = 1.2
             overlay_color = (56, 189, 248)
 
         elif "urban" in tgt_lower or "building" in tgt_lower or "built-up" in tgt_lower or "house" in tgt_lower or "structure" in tgt_lower:
             # Built-up / Structures: moderate-to-high brightness, low color saturation, non-water
-            urban_mask = (color_sat < 32) & (brightness > 65) & (brightness < 235)
-            candidate_components = find_connected_regions(urban_mask, min_pixels=50, min_area_pct=0.6)
-            label_prefix = "Built-up Area" if "built-up" in tgt_lower else "Buildings"
+            urban_mask = (color_sat < 35) & (brightness > 65) & (brightness < 235)
+            candidate_components = find_connected_regions(urban_mask, min_pixels=45, min_area_pct=0.5)
+            label_prefix = "Built-up Area" if ("built-up" in tgt_lower or "urban" in tgt_lower) else "Buildings"
             spectral_contrast = 1.1
             overlay_color = (251, 146, 60)
 
         elif "agri" in tgt_lower or "crop" in tgt_lower or "farm" in tgt_lower:
             # Agricultural fields
             agri_mask = (g > r + 8) & (g > b + 4) & (g > 35)
-            candidate_components = find_connected_regions(agri_mask, min_pixels=50, min_area_pct=0.5)
+            candidate_components = find_connected_regions(agri_mask, min_pixels=45, min_area_pct=0.5)
             label_prefix = "Agricultural Parcel"
             spectral_contrast = 1.15
             overlay_color = (74, 222, 128)
 
         elif "veg" in tgt_lower or "forest" in tgt_lower or "tree" in tgt_lower or "green" in tgt_lower:
             # Vegetation / Forest Canopy
-            veg_mask = (g > r + 10) & (g > b + 6) & (g > 30)
-            candidate_components = find_connected_regions(veg_mask, min_pixels=50, min_area_pct=0.5)
+            veg_mask = (g > r + 8) & (g > b + 4) & (g > 30)
+            candidate_components = find_connected_regions(veg_mask, min_pixels=45, min_area_pct=0.45)
             label_prefix = "Forest Canopy" if "forest" in tgt_lower else "Vegetation"
             spectral_contrast = 1.2
             overlay_color = (34, 197, 94)
@@ -523,7 +572,7 @@ class HeuristicGroundingModel(BaseGroundingModel):
         elif "soil" in tgt_lower or "bare" in tgt_lower or "substrate" in tgt_lower or "dirt" in tgt_lower:
             # Soil / Bare ground
             soil_mask = (r > g) & (g > b) & (r > 70) & (color_sat >= 15)
-            candidate_components = find_connected_regions(soil_mask, min_pixels=45, min_area_pct=0.5)
+            candidate_components = find_connected_regions(soil_mask, min_pixels=40, min_area_pct=0.45)
             label_prefix = "Exposed Soil"
             spectral_contrast = 1.05
             overlay_color = (217, 119, 6)
@@ -531,28 +580,28 @@ class HeuristicGroundingModel(BaseGroundingModel):
         elif "runway" in tgt_lower or "airport" in tgt_lower:
             # Paved linear corridors
             paved_mask = (color_sat < 22) & (brightness > 50) & (brightness < 175)
-            candidate_components = find_connected_regions(paved_mask, min_pixels=60, min_area_pct=0.8)
+            candidate_components = find_connected_regions(paved_mask, min_pixels=50, min_area_pct=0.7)
             label_prefix = "Runway Corridor"
             spectral_contrast = 1.1
             overlay_color = (148, 163, 184)
 
         elif "road" in tgt_lower or "highway" in tgt_lower or "street" in tgt_lower:
             road_mask = (color_sat < 25) & (brightness > 45) & (brightness < 165)
-            candidate_components = find_connected_regions(road_mask, min_pixels=45, min_area_pct=0.4)
+            candidate_components = find_connected_regions(road_mask, min_pixels=40, min_area_pct=0.35)
             label_prefix = "Road Network"
             spectral_contrast = 1.05
             overlay_color = (203, 213, 225)
 
         elif "solar" in tgt_lower or "photovoltaic" in tgt_lower:
             solar_mask = (b > r + 10) & (b < 95) & (r < 65) & (g < 75)
-            candidate_components = find_connected_regions(solar_mask, min_pixels=40, min_area_pct=0.4)
+            candidate_components = find_connected_regions(solar_mask, min_pixels=35, min_area_pct=0.35)
             label_prefix = "Solar PV Array"
             spectral_contrast = 1.15
             overlay_color = (99, 102, 241)
 
         elif "ship" in tgt_lower or "vessel" in tgt_lower or "boat" in tgt_lower:
             ship_mask = (brightness > 175) & (color_sat < 50)
-            candidate_components = find_connected_regions(ship_mask, min_pixels=25, min_area_pct=0.15)
+            candidate_components = find_connected_regions(ship_mask, min_pixels=20, min_area_pct=0.15)
             label_prefix = "Maritime Vessel"
             spectral_contrast = 1.2
             overlay_color = (244, 63, 94)
@@ -591,11 +640,15 @@ class HeuristicGroundingModel(BaseGroundingModel):
                 detections=[],
                 success=False,
                 confidence=None,
+                confidence_qualitative="Low",
                 confidence_type="heuristic",
                 model_name=self.model_id,
                 model_type="HEURISTIC",
                 is_mock=False,
                 is_heuristic=True,
+                headline=f"{label_prefix} could not be identified reliably",
+                details=f"I couldn't identify the requested {tgt} reliably in this image based on the available visual evidence.",
+                location_description=None,
                 message=f"Unable to reliably localize the requested target '{tgt}' using the available heuristic grounding method.",
                 raw_details={"rejection_reasons": rejections, "candidates_evaluated": len(candidate_components)},
             )
@@ -605,6 +658,11 @@ class HeuristicGroundingModel(BaseGroundingModel):
         primary_comp = candidate_components[0]
         bbox_coverage = primary_box.bbox_coverage_pct or round((primary_box.xmax - primary_box.xmin) * (primary_box.ymax - primary_box.ymin) * 100.0, 1)
         mask_coverage = primary_comp.get("mask_area_pct", 0.0)
+
+        # Natural location description
+        loc_desc = get_spatial_location_description(
+            primary_box.xmin, primary_box.ymin, primary_box.xmax, primary_box.ymax
+        )
 
         # Generate PNG mask overlay
         mask_url = None
@@ -623,7 +681,19 @@ class HeuristicGroundingModel(BaseGroundingModel):
             img_h,
         )
 
-        msg = (
+        # Qualitative confidence
+        conf_num = primary_box.confidence or 0.80
+        if conf_num >= 0.80:
+            conf_qual = "High"
+        elif conf_num >= 0.65:
+            conf_qual = "Moderate"
+        else:
+            conf_qual = "Low"
+
+        # User-friendly natural answers
+        headline = f"{label_prefix} detected."
+        details = f"The detected {tgt} is mainly located in the {loc_desc}."
+        tech_msg = (
             f"Localized primary {tgt} boundary spanning [{pct_info['x_range']} X, {pct_info['y_range']} Y]. "
             f"Bounding box covers {bbox_coverage}% of the image. "
             f"Detected mask covers {mask_coverage}% of the image (heuristic grounding)."
@@ -635,12 +705,16 @@ class HeuristicGroundingModel(BaseGroundingModel):
             detections=valid_boxes,
             success=True,
             confidence=primary_box.confidence,
+            confidence_qualitative=conf_qual,
             confidence_type="heuristic",
             model_name=self.model_id,
             model_type="HEURISTIC",
             is_mock=False,
             is_heuristic=True,
-            message=msg,
+            headline=headline,
+            details=details,
+            location_description=loc_desc,
+            message=tech_msg,
             mask_url=mask_url,
             mask_coverage_pct=mask_coverage,
             bbox_coverage_pct=bbox_coverage,
@@ -649,6 +723,7 @@ class HeuristicGroundingModel(BaseGroundingModel):
                 "primary_bbox_coverage_pct": bbox_coverage,
                 "primary_mask_coverage_pct": mask_coverage,
                 "percentage_coordinates": pct_info,
+                "location_description": loc_desc,
                 "rejections": rejections,
             },
         )

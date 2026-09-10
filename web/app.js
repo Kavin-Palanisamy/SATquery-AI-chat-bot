@@ -727,8 +727,49 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error('Invalid response structure received from backend.');
     }
 
-    // 1. Text & Tags Display
+    // 1. Text & User-Friendly Primary Display
+    const headline = data.headline || (data.task === 'grounding' ? 'Target Detected' : (data.task === 'bitemporal_change' ? 'Change Analysis' : (data.task === 'optical_sar_fusion' ? 'Optical + SAR Fusion' : 'Analysis Complete')));
+    setText('resHeadline', headline, 'Analysis Complete');
     setText('resAnswer', data.answer, 'No answer returned.');
+
+    // 2. Findings Summary Grid
+    const whatVal = data.headline || (data.task ? data.task.toUpperCase().replace(/_/g, ' ') : 'Land Cover');
+    setText('findingWhat', whatVal, '—');
+
+    const whereVal = data.location_summary || (data.boxes && data.boxes.length > 0 ? 'Highlighted area' : 'Full scene area');
+    setText('findingWhere', whereVal, '—');
+
+    let visualVal = data.visual_summary;
+    if (!visualVal) {
+      if (data.change_map_url) visualVal = 'Change difference heatmap';
+      else if (data.boxes && data.boxes.length > 0) visualVal = 'Highlighted region & mask';
+      else visualVal = 'Qualitative scene assessment';
+    }
+    setText('findingVisual', visualVal, '—');
+
+    const confLevel = data.confidence_level || (data.confidence ? `${Math.round(data.confidence * 100)}%` : 'Qualitative / Uncalibrated');
+    setText('findingConfidence', confLevel, '—');
+
+    // Confidence Pill
+    const pill = document.getElementById('resConfidencePill');
+    if (pill) {
+      pill.className = 'confidence-pill';
+      if (data.confidence_level === 'High' || (typeof data.confidence === 'number' && data.confidence >= 0.8)) {
+        pill.classList.add('conf-high');
+        pill.textContent = 'Confidence: High';
+      } else if (data.confidence_level === 'Moderate' || (typeof data.confidence === 'number' && data.confidence >= 0.6)) {
+        pill.classList.add('conf-mod');
+        pill.textContent = 'Confidence: Moderate';
+      } else if (data.confidence_level === 'Low') {
+        pill.classList.add('conf-low');
+        pill.textContent = 'Confidence: Low';
+      } else {
+        pill.classList.add('conf-qual');
+        pill.textContent = 'Qualitative VLM';
+      }
+    }
+
+    // 3. Technical Tags
     const displayTask = (data.task || currentMode || 'VQA').toUpperCase().replace(/_/g, ' ');
     setText('resTask', displayTask, 'UNKNOWN');
     setText('resTool', data.tool_used, 'Specialist Tool');
@@ -752,7 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
       : '—';
     setText('resLatency', latencyStr, '—');
 
-    // Confidence - formatted defensively (never fake confidence)
+    // Confidence score
     let confText = '—';
     if (typeof data.confidence === 'number' && !isNaN(data.confidence)) {
       confText = `${Math.round(data.confidence * 100)}%`;

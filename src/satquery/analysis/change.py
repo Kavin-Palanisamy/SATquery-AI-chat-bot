@@ -94,34 +94,28 @@ def analyze_bitemporal_change(
 
     if "water" in q_lower or "flood" in q_lower:
         if change_pct > 5.0:
-            answer = (
-                f"Bi-temporal analysis between T1 and T2 indicates significant hydrologic change ({change_pct}% of area). "
-                f"Water body extent expanded across the low-elevation drainage corridor, consistent with seasonal inundation."
-            )
+            answer = f"Water change detected. Water extent expanded across the highlighted region between the two dates ({change_pct}% of the scene)."
         else:
-            answer = f"Water surface area remained stable between both observation dates (less than {max(change_pct, 1.0)}% variance detected)."
+            answer = f"No significant water change detected between both dates (less than {max(change_pct, 1.0)}% variance)."
 
     elif "urban" in q_lower or "built-up" in q_lower or "building" in q_lower:
-        answer = (
-            f"Detected {change_pct}% surface alteration between T1 and T2. "
-            f"Built-up artificial surfaces increased in the suburban periphery with new construction footprints highlighted in the change heatmap."
-        )
+        if change_pct > 2.0:
+            answer = f"Built-up change detected. New structures and developed areas expanded in the highlighted region between the two dates ({change_pct}% change)."
+        else:
+            answer = "No significant built-up change detected between the two dates."
 
     elif "forest" in q_lower or "tree" in q_lower or "vegetation" in q_lower or "agri" in q_lower:
-        answer = (
-            f"Vegetation canopy assessment reveals {change_pct}% spectral variation. "
-            f"Agricultural parcels transition from pre-sowing bare soil in T1 to mature crop cover in T2."
-        )
+        if change_pct > 2.0:
+            answer = f"Vegetation change detected. Crop and green canopy variations are visible in the highlighted region ({change_pct}% difference)."
+        else:
+            answer = "Vegetation levels remained stable between the two observation dates."
 
     else:
         # General change query
         if change_pct > 2.0:
-            answer = (
-                f"Surface change detected across {change_pct}% of the geographic footprint between observation dates T1 and T2. "
-                f"Primary alterations are concentrated in the central and southeastern quadrants."
-            )
+            answer = f"Change detected. Surface differences were detected across {change_pct}% of the image, highlighted in the change map."
         else:
-            answer = "No major macroscopic landscape alterations detected between T1 and T2. Land-cover classification remained consistent."
+            answer = "No significant landscape changes were detected between the two dates."
 
     confidence = round(min(0.85 + (change_pct / 200.0), 0.96), 2)
     return answer, change_map_url, confidence

@@ -221,54 +221,54 @@ class MockVQAModel(BaseVQAModel):
         # ---------------------------------------------------------------------
         # 3. Qualitative Presence / Scene Description Questions
         # ---------------------------------------------------------------------
+        is_yes_no_query = bool(re.search(r"^(?:is\s+there|are\s+there|do\s+you\s+see|can\s+you\s+see|does\s+this\s+image\s+have)\b", q_lower))
+
         if "water" in q_lower or "river" in q_lower or "lake" in q_lower or "reservoir" in q_lower:
             if evidence_items and evidence_items[0].type == EvidenceType.SPATIAL:
                 sp_ev = evidence_items[0]
-                region_desc = "in the western portion of the scene" if "western" in str(sp_ev.description).lower() else "in the scene"
+                region_desc = "in the western area" if "western" in str(sp_ev.description).lower() else "in the highlighted region"
                 answer_text = (
-                    f"Yes. A water body appears to be visible in the scene. "
-                    f"The grounding module identified a candidate region {region_desc}."
+                    f"Yes. A water body appears to be visible in the scene, located {region_desc}."
+                    if is_yes_no_query
+                    else f"Water body detected. It is visible {region_desc}."
                 )
             elif has_water_like:
-                answer_text = "Water-like regions appear to be visible in the image."
+                answer_text = "Yes. A water body appears to be visible in the scene." if is_yes_no_query else "Water features are visible in this scene."
             else:
-                answer_text = "No prominent water bodies appear to be visible in this scene based on observable visual characteristics."
+                answer_text = "No. No prominent water bodies are visible in this scene." if is_yes_no_query else "No prominent water bodies are visible in this image."
 
         elif "airport" in q_lower or "runway" in q_lower or "airfield" in q_lower:
-            answer_text = "The image shows an aviation transport facility featuring high-albedo linear paved runways, taxiways, and associated apron infrastructure."
+            answer_text = "Yes. An airport facility with runways is visible." if is_yes_no_query else "The image shows an airport facility with runways and taxiways."
 
         elif "port" in q_lower or "harbor" in q_lower or "dock" in q_lower or "coastal" in q_lower:
-            answer_text = "This scene depicts a coastal interface with maritime infrastructure, shoreline boundaries, and docking facilities."
+            answer_text = "Yes. A coastal port facility is visible." if is_yes_no_query else "The scene shows a coastal harbor with maritime infrastructure and docking facilities."
 
         elif "urban" in q_lower or "building" in q_lower or "city" in q_lower or "structure" in q_lower:
             if evidence_items and evidence_items[0].type == EvidenceType.SPATIAL:
-                answer_text = (
-                    "Yes. Built-up infrastructure is visible in the scene. "
-                    "The grounding module identified candidate building structures in the image."
-                )
+                answer_text = "Yes. Built-up structures are visible in the highlighted region." if is_yes_no_query else "Built-up areas and building structures are visible in the image."
             elif has_urban_like:
-                answer_text = "Built-up surfaces, developed parcels, and structural rooftop clusters are observable in the image."
+                answer_text = "Yes. Built-up structures are visible in the image." if is_yes_no_query else "Built-up areas and building structures are observable in the image."
             else:
-                answer_text = "The scene appears primarily natural or rural, with minimal visible built-up structures."
+                answer_text = "No prominent built-up structures are visible in this scene."
 
         elif "agri" in q_lower or "crop" in q_lower or "farm" in q_lower or "vegetation" in q_lower or "forest" in q_lower or "green" in q_lower:
             if has_veg_like:
-                answer_text = "Vegetated canopy parcels and active photosynthetic green cover are visible across portions of the scene."
+                answer_text = "Yes. Vegetation and green canopy areas are visible." if is_yes_no_query else "Vegetation and green canopy areas are visible across the scene."
             else:
-                answer_text = "Limited vegetative cover is visible; the scene consists predominantly of developed or exposed substrate."
+                answer_text = "Limited vegetation is visible in this scene."
 
         elif "road" in q_lower or "highway" in q_lower or "transit" in q_lower:
-            answer_text = "Linear transportation corridors and connecting roadway structures are visible traversing through the scene."
+            answer_text = "Yes. Roads are visible in the image." if is_yes_no_query else "Roads and transit corridors are visible traversing through the scene."
 
         else:
-            # General scene description (honest, no fake percentages)
+            # General scene description (honest, natural, no jargon)
             classes = []
             if has_urban_like: classes.append("built-up areas")
             if has_veg_like: classes.append("vegetation")
-            if has_water_like: classes.append("a water feature")
-            if not classes: classes.append("natural terrain and exposed substrate")
+            if has_water_like: classes.append("a visible water region")
+            if not classes: classes.append("natural terrain and open ground")
 
-            composition_desc = ", ".join(classes)
+            composition_desc = " and ".join(classes) if len(classes) <= 2 else f"{', '.join(classes[:-1])}, with {classes[-1]}"
             answer_text = f"The scene appears to contain {composition_desc}."
 
         return VQAAnswerResult(

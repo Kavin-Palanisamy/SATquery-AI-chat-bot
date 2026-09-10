@@ -28,6 +28,11 @@ class AnswerSynthesizer:
         execution_time_sec: float = 0.0,
         execution_trace: Optional[Dict[str, Any]] = None,
         limitations: Optional[List[str]] = None,
+        headline: Optional[str] = None,
+        details: Optional[str] = None,
+        location_summary: Optional[str] = None,
+        visual_summary: Optional[str] = None,
+        confidence_level: Optional[str] = None,
     ) -> AgentResponse:
         evidence_items = evidence_items or []
         metadata = metadata or {}
@@ -46,6 +51,11 @@ class AnswerSynthesizer:
             evidence_used=evidence_used,
             tool_used=tool_used,
             confidence=confidence,
+            confidence_level=confidence_level,
+            headline=headline,
+            details=details,
+            location_summary=location_summary,
+            visual_summary=visual_summary,
             boxes=boxes,
             change_map_url=change_map_url,
             grounding_mask_url=grounding_mask_url,
