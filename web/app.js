@@ -473,20 +473,35 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = '<div class="prov-empty">No executions recorded yet. Launch a studio above to run queries!</div>';
             return;
           }
-          container.innerHTML = data.map((item, idx) => `
+          container.innerHTML = data.map((item, idx) => {
+            const taskStr = escapeHtml((item.task || 'vqa').toUpperCase().replace(/_/g, ' '));
+            const modelStr = escapeHtml(item.model || 'Specialist Engine');
+            const provStr = escapeHtml(String(item.model_mode || item.provenance || 'REAL').toUpperCase());
+            const queryStr = escapeHtml(item.question || '');
+            const inputStr = escapeHtml(item.input || '1 image');
+            const outputStr = escapeHtml(item.output || '—');
+            const latStr = item.execution_time_sec !== undefined ? `${item.execution_time_sec}s` : '—';
+            const dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString() : '';
+
+            return `
             <div class="prov-item">
-              <div>
-                <div><strong>#${data.length - idx} [${escapeHtml((item.task || 'vqa').toUpperCase())}]</strong> — <em>${escapeHtml(item.model || '—')}</em></div>
-                <div style="color: #c5cedd; margin-top: 4px;"><strong>Query:</strong> "${escapeHtml(item.question || '')}"</div>
-                <div style="color: #9aa4b8; font-size: 12px; margin-top: 2px;"><strong>Files:</strong> ${escapeHtml(item.input || '—')}</div>
-                <div style="color: #5eead4; margin-top: 4px;"><strong>Result:</strong> ${escapeHtml(item.output || '—')}</div>
+              <div class="prov-item-body">
+                <div class="prov-item-header">
+                  <span class="badge-tag">${taskStr}</span>
+                  <span class="badge-tag prov">${provStr}</span>
+                  <span class="prov-model-name">${modelStr}</span>
+                </div>
+                <div class="prov-query-text"><strong>Query:</strong> "${queryStr}"</div>
+                <div class="prov-result-text"><strong>Result:</strong> ${outputStr}</div>
+                <div class="prov-file-text">📁 Inputs: <span>${inputStr}</span></div>
               </div>
               <div class="prov-meta">
-                <span>${escapeHtml(item.execution_time_sec !== undefined ? item.execution_time_sec + 's' : '')}</span>
-                <span>${escapeHtml(item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : '')}</span>
+                <span class="prov-latency">⚡ ${latStr}</span>
+                <span class="prov-time">🕒 ${dateStr}</span>
               </div>
             </div>
-          `).join('');
+            `;
+          }).join('');
         }
       }
     } catch (e) {

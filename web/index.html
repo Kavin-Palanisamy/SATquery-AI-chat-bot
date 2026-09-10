@@ -81,6 +81,74 @@
         </div>
       </main>
 
+      <!-- Core Working Capabilities Section -->
+      <section class="panel-section" id="capabilities">
+        <div class="panel">
+          <div>
+            <div class="eyebrow small"><span class="dot"></span> Working Capabilities</div>
+            <h2>What SatQuery AI Can Do</h2>
+            <p>Explore the four dedicated analysis studios designed for Earth Observation imagery.</p>
+          </div>
+          <div class="capabilities-grid">
+            <div class="capability-card">
+              <div class="cap-header">
+                <span class="cap-icon">💬</span>
+                <h3>Ask Questions</h3>
+              </div>
+              <p class="cap-desc"><strong>What it does:</strong> Qualitative scene understanding, land-cover identification, and spatial feature reasoning without hallucinated numbers.</p>
+              <div class="cap-input"><strong>Input needed:</strong> 1 satellite image (Optical / GeoTIFF / PNG / JPEG)</div>
+              <div class="cap-example">
+                <strong>Example question:</strong>
+                <em>"Describe the land cover and major objects visible in this image."</em>
+              </div>
+              <a href="/vqa" class="cap-link nav-link" data-route="vqa">Try Ask Questions →</a>
+            </div>
+
+            <div class="capability-card">
+              <div class="cap-header">
+                <span class="cap-icon">🎯</span>
+                <h3>Find Objects</h3>
+              </div>
+              <p class="cap-desc"><strong>What it does:</strong> Pinpoints target features on the ground with precise bounding boxes and colorized segmentation masks.</p>
+              <div class="cap-input"><strong>Input needed:</strong> 1 satellite image (Optical / GeoTIFF / PNG / JPEG)</div>
+              <div class="cap-example">
+                <strong>Example question:</strong>
+                <em>"Find and highlight the water body in this image."</em>
+              </div>
+              <a href="/grounding" class="cap-link nav-link" data-route="grounding">Try Find Objects →</a>
+            </div>
+
+            <div class="capability-card">
+              <div class="cap-header">
+                <span class="cap-icon">🔄</span>
+                <h3>Before &amp; After</h3>
+              </div>
+              <p class="cap-desc"><strong>What it does:</strong> Compares two dates of the same area to identify surface alteration, construction, or flood dynamics.</p>
+              <div class="cap-input"><strong>Input needed:</strong> 2 optical images (Before T1 + After T2)</div>
+              <div class="cap-example">
+                <strong>Example question:</strong>
+                <em>"What changed between these two dates?"</em>
+              </div>
+              <a href="/change" class="cap-link nav-link" data-route="change">Try Before &amp; After →</a>
+            </div>
+
+            <div class="capability-card">
+              <div class="cap-header">
+                <span class="cap-icon">🛰️</span>
+                <h3>See Through Clouds</h3>
+              </div>
+              <p class="cap-desc"><strong>What it does:</strong> Cross-fuses optical spectral bands with microwave SAR radar backscatter to analyze terrain obscured by clouds.</p>
+              <div class="cap-input"><strong>Input needed:</strong> 1 Optical image + 1 SAR radar image</div>
+              <div class="cap-example">
+                <strong>Example question:</strong>
+                <em>"Use optical and SAR together to identify built-up and water regions."</em>
+              </div>
+              <a href="/fusion" class="cap-link nav-link" data-route="fusion">Try Cloud Penetration →</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Benchmark Datasets Section -->
       <section class="panel-section" id="benchmarks">
         <div class="panel">

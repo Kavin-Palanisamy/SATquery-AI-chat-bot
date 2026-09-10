@@ -109,6 +109,7 @@ class MockVQAModel(BaseVQAModel):
         q_clean = question.strip()
         q_lower = q_clean.lower()
         w, h = image.size
+        total_pixels = float(w * h)
 
         # Inspect image visual characteristics qualitatively
         img_rgb = image.convert("RGB")
@@ -117,11 +118,57 @@ class MockVQAModel(BaseVQAModel):
         color_sat = np.max(arr, axis=2) - np.min(arr, axis=2)
         brightness = np.mean(arr, axis=2)
 
-        # Approximate qualitative presence (boolean thresholds, no fake precision claims)
-        has_water_like = bool(np.any((b > r + 15) & (b > g - 10) & (r < 115)))
-        has_veg_like = bool(np.any((g > r + 8) & (g > b + 4) & (g > 35)))
-        has_urban_like = bool(np.any((color_sat < 32) & (brightness > 65) & (brightness < 235)))
-        has_paved_like = bool(np.any((color_sat < 22) & (brightness > 50) & (brightness < 175)))
+        # Spectral feature masks
+        water_mask = (
+            ((b > r + 10) & (b > g - 15) & (r < 130) & (brightness < 170))
+            | ((brightness < 40) & (color_sat < 25) & (r < 50) & (g < 50))
+        )
+        water_ratio = float(np.count_nonzero(water_mask) / total_pixels)
+        has_water_like = water_ratio > 0.01
+
+        veg_mask = (
+            ((g > r + 5) & (g > b + 3) & (g > 35) & (brightness < 210))
+            | ((g > r + 3) & (g > b) & (brightness < 120))
+        )
+        veg_ratio = float(np.count_nonzero(veg_mask) / total_pixels)
+        has_veg_like = veg_ratio > 0.03
+
+        urban_mask = (color_sat < 35) & (brightness >= 65) & (brightness <= 245) & (~water_mask)
+        urban_ratio = float(np.count_nonzero(urban_mask) / total_pixels)
+        has_urban_like = urban_ratio > 0.04
+
+        soil_mask = (r > g) & (g > b) & (color_sat > 15) & (brightness > 75) & (brightness < 235) & (~veg_mask) & (~water_mask)
+        soil_ratio = float(np.count_nonzero(soil_mask) / total_pixels)
+        has_soil = soil_ratio > 0.03
+
+        has_paved_like = has_urban_like and (urban_ratio > 0.02)
+
+        def get_feature_location(mask: np.ndarray) -> str:
+            count = np.count_nonzero(mask)
+            if count == 0:
+                return "across the scene"
+            mid_y, mid_x = h // 2, w // 2
+            nw = np.count_nonzero(mask[:mid_y, :mid_x])
+            ne = np.count_nonzero(mask[:mid_y, mid_x:])
+            sw = np.count_nonzero(mask[mid_y:, :mid_x])
+            se = np.count_nonzero(mask[mid_y:, mid_x:])
+            cnt_center = np.count_nonzero(mask[h//4:3*h//4, w//4:3*w//4])
+
+            if cnt_center > 0.55 * count:
+                return "in the central area of the scene"
+            quads = {"upper-left (northwestern)": nw, "upper-right (northeastern)": ne, "lower-left (southwestern)": sw, "lower-right (southeastern)": se}
+            max_name, max_cnt = max(quads.items(), key=lambda x: x[1])
+            if max_cnt > 0.40 * count:
+                return f"in the {max_name} section of the image"
+            if (nw + sw) > 0.60 * count:
+                return "in the western section of the image"
+            if (ne + se) > 0.60 * count:
+                return "in the eastern section of the image"
+            if (nw + ne) > 0.60 * count:
+                return "in the northern portion of the image"
+            if (sw + se) > 0.60 * count:
+                return "in the southern portion of the image"
+            return "across the scene"
 
         evidence_items: List[EvidenceItem] = []
         grounding_data = context.get("grounding")
@@ -193,7 +240,7 @@ class MockVQAModel(BaseVQAModel):
                 model_info=self.get_model_info(),
                 confidence=None,
                 evidence=evidence_items,
-                metadata={"question_type": "quantitative_percentage"},
+                metadata={"question_type": "quantitative_percentage", "headline": "Coverage Measured"},
             )
 
         if is_count_query:
@@ -204,7 +251,7 @@ class MockVQAModel(BaseVQAModel):
                 model_info=self.get_model_info(),
                 confidence=None,
                 evidence=evidence_items,
-                metadata={"question_type": "quantitative_count"},
+                metadata={"question_type": "quantitative_count", "headline": "Counting Refusal"},
             )
 
         if is_area_query:
@@ -215,13 +262,86 @@ class MockVQAModel(BaseVQAModel):
                 model_info=self.get_model_info(),
                 confidence=None,
                 evidence=evidence_items,
-                metadata={"question_type": "quantitative_area"},
+                metadata={"question_type": "quantitative_area", "headline": "Area Calculation Refusal"},
             )
 
         # ---------------------------------------------------------------------
-        # 3. Qualitative Presence / Scene Description Questions
+        # 3. Spatial Location Questions ("Where is the water / vegetation / building?")
         # ---------------------------------------------------------------------
-        is_yes_no_query = bool(re.search(r"^(?:is\s+there|are\s+there|do\s+you\s+see|can\s+you\s+see|does\s+this\s+image\s+have)\b", q_lower))
+        is_spatial_q = bool(re.search(r"\b(?:where\s+is|where\s+are|location\s+of|which\s+part)\b", q_lower))
+        if is_spatial_q:
+            if "water" in q_lower or "lake" in q_lower or "river" in q_lower or "reservoir" in q_lower:
+                if has_water_like:
+                    loc = get_feature_location(water_mask)
+                    ans = f"The water body is primarily located {loc}."
+                    headline = "Water Body Location"
+                    loc_summary = loc.replace("in the ", "").capitalize()
+                else:
+                    ans = "No prominent water bodies were detected in this image to locate."
+                    headline = "Water Not Detected"
+                    loc_summary = "Not detected"
+            elif "veg" in q_lower or "forest" in q_lower or "crop" in q_lower or "farm" in q_lower:
+                if has_veg_like:
+                    loc = get_feature_location(veg_mask)
+                    ans = f"Vegetation and agricultural areas are primarily concentrated {loc}."
+                    headline = "Vegetation Location"
+                    loc_summary = loc.replace("in the ", "").capitalize()
+                else:
+                    ans = "No prominent vegetation was detected in this scene to locate."
+                    headline = "Vegetation Not Detected"
+                    loc_summary = "Not detected"
+            elif "urban" in q_lower or "building" in q_lower or "structure" in q_lower or "city" in q_lower:
+                if has_urban_like:
+                    loc = get_feature_location(urban_mask)
+                    ans = f"Built-up structures and urban areas are primarily concentrated {loc}."
+                    headline = "Built-up Area Location"
+                    loc_summary = loc.replace("in the ", "").capitalize()
+                else:
+                    ans = "No prominent built-up structures were detected in this scene to locate."
+                    headline = "Built-up Not Detected"
+                    loc_summary = "Not detected"
+            else:
+                ans = "The visible features are distributed across the scene."
+                headline = "Spatial Distribution"
+                loc_summary = "Full scene"
+
+            return VQAAnswerResult(
+                answer=ans,
+                model_info=self.get_model_info(),
+                confidence=None,
+                evidence=evidence_items,
+                metadata={"headline": headline, "location_summary": loc_summary, "visual_summary": "Spatial location assessment", "image_dimensions": f"{w}x{h}"},
+            )
+
+        # ---------------------------------------------------------------------
+        # 4. Comparative Questions ("Is this area mainly urban or rural?")
+        # ---------------------------------------------------------------------
+        is_comparative = bool(re.search(r"\b(?:urban\s+or\s+rural|rural\s+or\s+urban|predominantly\s+urban|mainly\s+urban|mainly\s+rural)\b", q_lower))
+        if is_comparative:
+            if urban_ratio > (veg_ratio + soil_ratio + 0.05):
+                ans = "This area is predominantly urban, characterized by dense built-up structures, paved surfaces, and road infrastructure with limited vegetation."
+                headline = "Predominantly Urban Area"
+                loc_summary = "Dense urban footprint"
+            else:
+                ans = "This area is predominantly rural, dominated by agricultural fields, natural vegetation, and open terrain with minimal built-up infrastructure."
+                headline = "Predominantly Rural Area"
+                loc_summary = "Agricultural / rural terrain"
+
+            return VQAAnswerResult(
+                answer=ans,
+                model_info=self.get_model_info(),
+                confidence=None,
+                evidence=evidence_items,
+                metadata={"headline": headline, "location_summary": loc_summary, "visual_summary": "Land use classification", "image_dimensions": f"{w}x{h}"},
+            )
+
+        # ---------------------------------------------------------------------
+        # 5. Qualitative Presence / Feature Questions
+        # ---------------------------------------------------------------------
+        is_yes_no_query = bool(re.search(r"^(?:is\s+there|are\s+there|do\s+you\s+see|can\s+you\s+see|does\s+this\s+image\s+have|any\s+water|any\s+building)\b", q_lower))
+
+        headline = "Scene Composition"
+        loc_summary = "Full scene area"
 
         if "water" in q_lower or "river" in q_lower or "lake" in q_lower or "reservoir" in q_lower:
             if evidence_items and evidence_items[0].type == EvidenceType.SPATIAL:
@@ -232,51 +352,99 @@ class MockVQAModel(BaseVQAModel):
                     if is_yes_no_query
                     else f"Water body detected. It is visible {region_desc}."
                 )
+                headline = "Water Body Detected"
+                loc_summary = region_desc
             elif has_water_like:
-                answer_text = "Yes. A water body appears to be visible in the scene." if is_yes_no_query else "Water features are visible in this scene."
+                loc = get_feature_location(water_mask)
+                answer_text = "Yes. A water body appears to be visible in the scene." if is_yes_no_query else f"Water features are visible in this scene, located {loc}."
+                headline = "Water Body Visible"
+                loc_summary = loc.replace("in the ", "").capitalize()
             else:
                 answer_text = "No. No prominent water bodies are visible in this scene." if is_yes_no_query else "No prominent water bodies are visible in this image."
+                headline = "No Water Detected"
 
         elif "airport" in q_lower or "runway" in q_lower or "airfield" in q_lower:
             answer_text = "Yes. An airport facility with runways is visible." if is_yes_no_query else "The image shows an airport facility with runways and taxiways."
+            headline = "Airport Facility"
 
         elif "port" in q_lower or "harbor" in q_lower or "dock" in q_lower or "coastal" in q_lower:
             answer_text = "Yes. A coastal port facility is visible." if is_yes_no_query else "The scene shows a coastal harbor with maritime infrastructure and docking facilities."
+            headline = "Port Facility"
 
         elif "urban" in q_lower or "building" in q_lower or "city" in q_lower or "structure" in q_lower:
             if evidence_items and evidence_items[0].type == EvidenceType.SPATIAL:
                 answer_text = "Yes. Built-up structures are visible in the highlighted region." if is_yes_no_query else "Built-up areas and building structures are visible in the image."
+                headline = "Built-up Structures Present"
             elif has_urban_like:
-                answer_text = "Yes. Built-up structures are visible in the image." if is_yes_no_query else "Built-up areas and building structures are observable in the image."
+                loc = get_feature_location(urban_mask)
+                answer_text = f"Yes. Built-up structures are visible in the image, located {loc}." if is_yes_no_query else f"Built-up areas and building structures are observable in the image, located {loc}."
+                headline = "Built-up Structures Present"
+                loc_summary = loc.replace("in the ", "").capitalize()
             else:
                 answer_text = "No prominent built-up structures are visible in this scene."
+                headline = "No Buildings Detected"
 
         elif "agri" in q_lower or "crop" in q_lower or "farm" in q_lower or "vegetation" in q_lower or "forest" in q_lower or "green" in q_lower:
             if has_veg_like:
-                answer_text = "Yes. Vegetation and green canopy areas are visible." if is_yes_no_query else "Vegetation and green canopy areas are visible across the scene."
+                loc = get_feature_location(veg_mask)
+                answer_text = "Yes. Vegetation and green canopy areas are visible across the scene." if is_yes_no_query else "Vegetation and green canopy areas are visible across the scene."
+                headline = "Vegetation Present"
+                loc_summary = loc.replace("in the ", "").capitalize()
             else:
                 answer_text = "Limited vegetation is visible in this scene."
+                headline = "Sparse Vegetation"
 
         elif "road" in q_lower or "highway" in q_lower or "transit" in q_lower:
-            answer_text = "Yes. Roads are visible in the image." if is_yes_no_query else "Roads and transit corridors are visible traversing through the scene."
+            if has_paved_like:
+                answer_text = "Yes. Roads are visible in the image." if is_yes_no_query else "Roads and transit corridors are visible traversing through the scene."
+                headline = "Roads Visible"
+            else:
+                answer_text = "No prominent road networks are visible in this scene."
+                headline = "No Roads Detected"
+
+        elif any(w in q_lower for w in ["types of land cover", "land cover types", "what land types", "land use types"]):
+            classes = []
+            if has_veg_like: classes.append("agricultural vegetation and tree canopy")
+            if has_urban_like: classes.append("built-up urban structures and paved roads")
+            if has_water_like: classes.append("open water bodies")
+            if has_soil: classes.append("bare soil and open terrain")
+            if not classes: classes.append("natural terrain")
+
+            comp = " and ".join(classes) if len(classes) <= 2 else f"{', '.join(classes[:-1])}, and {classes[-1]}"
+            answer_text = f"The visible land cover types in this image include {comp}."
+            headline = "Land Cover Types"
 
         else:
             # General scene description (honest, natural, no jargon)
             classes = []
             if has_urban_like: classes.append("built-up areas")
             if has_veg_like: classes.append("vegetation")
+            if has_paved_like and has_urban_like: classes.append("roads")
             if has_water_like: classes.append("a visible water region")
+            if has_soil: classes.append("open terrain")
             if not classes: classes.append("natural terrain and open ground")
 
-            composition_desc = " and ".join(classes) if len(classes) <= 2 else f"{', '.join(classes[:-1])}, with {classes[-1]}"
-            answer_text = f"The scene appears to contain {composition_desc}."
+            if len(classes) == 1:
+                comp_str = classes[0]
+            elif len(classes) == 2:
+                comp_str = f"{classes[0]} and {classes[1]}"
+            else:
+                comp_str = f"{', '.join(classes[:-1])}, and {classes[-1]}"
+
+            answer_text = f"The scene appears to contain {comp_str}."
+            headline = "Scene Composition"
 
         return VQAAnswerResult(
             answer=answer_text,
             model_info=self.get_model_info(),
             confidence=None,
             evidence=evidence_items,
-            metadata={"image_dimensions": f"{w}x{h}"},
+            metadata={
+                "headline": headline,
+                "location_summary": loc_summary,
+                "visual_summary": "Qualitative spectral analysis",
+                "image_dimensions": f"{w}x{h}",
+            },
         )
 
 

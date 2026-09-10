@@ -523,11 +523,14 @@ class AgentExecutor:
             model_mode = vqa_res.model_info.mode
             rs_adaptation = vqa_res.model_info.rs_adaptation_status
             confidence_val = None
-            headline_out = "Land cover analyzed"
+            meta = vqa_res.metadata or {}
+            headline_out = meta.get("headline") or "Land cover analyzed"
             details_out = final_answer
-            location_summary_out = "Full image scene"
-            visual_summary_out = "Qualitative scene analysis"
+            location_summary_out = meta.get("location_summary") or "Full image scene"
+            visual_summary_out = meta.get("visual_summary") or "Qualitative scene analysis"
             confidence_level_out = "Uncalibrated"
+            if vqa_res.evidence:
+                evidence_items.extend(vqa_res.evidence)
 
         # -------------------------------------------------------------
         # STEP 5: Specialist Tool Execution
