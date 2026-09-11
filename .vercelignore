@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+tests/
+notebooks/
+outputs/
+.git/
+.agents/
+data/bigearthnet/
+data/cdvqa/
+data/vrsbench/

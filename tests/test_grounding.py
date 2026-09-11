@@ -287,3 +287,147 @@ def test_grounding_model_hierarchy():
     real_m = get_grounding_model(force_mock=False, allow_heuristic=False)
     assert isinstance(real_m, RealGroundingModel)
     assert real_m.model_type == "REAL"
+
+
+# ============================================================================
+# PHASE 8 REGRESSION TESTS: Target Accuracy, Invariants & Coordinate Correctness
+# ============================================================================
+def test_regression_water_vs_agriculture_discrimination():
+    """
+    REGRESSION TEST (Phase 8, Test 6):
+    Image with green agricultural vegetation on the LEFT and genuine dark water on the CENTER/RIGHT.
+    Verifies that the water detector locks onto the true water body and strictly rejects
+    the agricultural green fields.
+    """
+    H, W = 400, 400
+    arr = np.zeros((H, W, 3), dtype=np.uint8)
+    # Background: dry soil
+    arr[:, :] = [160, 140, 110]
+    # Agricultural green field on the LEFT (x: 20 to 140, y: 30 to 370)
+    arr[30:370, 20:140] = [40, 75, 65]
+    # Large dark water body toward the CENTER/RIGHT (x: 200 to 360, y: 80 to 320)
+    arr[80:320, 200:360] = [18, 30, 50]
+
+    img = Image.fromarray(arr)
+    model = HeuristicGroundingModel()
+    res = model.ground(img, "Find and highlight the water body in this image.")
+
+    assert res.success is True
+    assert len(res.detections) > 0
+    pbox = res.detections[0]
+
+    # Target must be on the right (x >= 0.5), NOT on the left agricultural field
+    assert pbox.xmin >= 0.45, f"Expected water box on right half, got xmin={pbox.xmin}"
+    assert pbox.xmax <= 0.95, f"Expected water box on right half, got xmax={pbox.xmax}"
+    assert pbox.ymin >= 0.15
+    assert pbox.ymax <= 0.85
+    assert "right" in res.location_description or "central" in res.location_description
+    assert res.label_prefix == "Water Body" if hasattr(res, "label_prefix") else True
+
+
+def test_regression_mask_bbox_alignment_invariant():
+    """
+    REGRESSION TEST (Phase 8, Test 5):
+    Ensures the strict invariant: bbox = bounding_box(mask).
+    The bounding box must tightly wrap the exact bounds of the binary mask.
+    """
+    H, W = 300, 300
+    arr = np.zeros((H, W, 3), dtype=np.uint8)
+    arr[:, :] = [160, 140, 110]
+    # Place water body at exact pixel coordinates: y: [60, 180), x: [120, 240)
+    arr[60:180, 120:240] = [15, 35, 75]
+
+    img = Image.fromarray(arr)
+    model = HeuristicGroundingModel()
+    res = model.ground(img, "Find the water body")
+
+    assert res.success is True
+    assert len(res.detections) > 0
+    pbox = res.detections[0]
+
+    # Expected normalized coordinates: xmin=120/300=0.40, ymin=60/300=0.20, xmax=240/300=0.80, ymax=180/300=0.60
+    assert abs(pbox.xmin - 0.40) < 0.02
+    assert abs(pbox.ymin - 0.20) < 0.02
+    assert abs(pbox.xmax - 0.80) < 0.02
+    assert abs(pbox.ymax - 0.60) < 0.02
+
+
+def test_regression_building_grounding():
+    """
+    REGRESSION TEST (Phase 8, Test 7):
+    Detects built-up / urban building structures.
+    """
+    H, W = 200, 200
+    arr = np.zeros((H, W, 3), dtype=np.uint8)
+    arr[:, :] = [40, 120, 40]  # Green background
+    # Bright gray built-up structure cluster in top-right
+    arr[20:80, 110:180] = [185, 190, 180]
+
+    img = Image.fromarray(arr)
+    model = HeuristicGroundingModel()
+    res = model.ground(img, "Find the buildings")
+
+    assert res.success is True
+    assert len(res.detections) > 0
+    pbox = res.detections[0]
+    assert pbox.xmin >= 0.50
+    assert pbox.ymin <= 0.45
+
+
+def test_regression_vegetation_grounding():
+    """
+    REGRESSION TEST (Phase 8, Test 8):
+    Detects vegetation canopy.
+    """
+    H, W = 200, 200
+    arr = np.zeros((H, W, 3), dtype=np.uint8)
+    arr[:, :] = [180, 170, 150]  # Bare soil background
+    # Dense green forest patch in bottom-left
+    arr[110:185, 20:95] = [30, 140, 40]
+
+    img = Image.fromarray(arr)
+    model = HeuristicGroundingModel()
+    res = model.ground(img, "Locate vegetation")
+
+    assert res.success is True
+    assert len(res.detections) > 0
+    pbox = res.detections[0]
+    assert pbox.xmin <= 0.50
+    assert pbox.ymin >= 0.50
+
+
+def test_regression_no_water_image_rejection():
+    """
+    REGRESSION TEST (Phase 8, Test 9):
+    Scene containing no water pixels (dry arid soil only).
+    Verifies that the system safely rejects and returns success=False without fake bboxes.
+    """
+    H, W = 200, 200
+    arr = np.zeros((H, W, 3), dtype=np.uint8)
+    arr[:, :] = [195, 160, 120]  # Pure desert sand/soil
+
+    img = Image.fromarray(arr)
+    model = HeuristicGroundingModel()
+    res = model.ground(img, "Find and highlight the water body in this image.")
+
+    assert res.success is False
+    assert res.detections == []
+    assert res.confidence is None
+    assert "could not be identified reliably" in res.headline.lower()
+
+
+def test_regression_invalid_or_empty_target():
+    """
+    REGRESSION TEST (Phase 8, Test 10):
+    Invalid or unlocalizable query.
+    Verifies graceful handling without crash.
+    """
+    H, W = 100, 100
+    arr = np.ones((H, W, 3), dtype=np.uint8) * 128
+    img = Image.fromarray(arr)
+    model = HeuristicGroundingModel()
+    res = model.ground(img, "????", target="unknown_entity_xyz")
+
+    assert res.success is False
+    assert res.detections == []
+

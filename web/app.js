@@ -632,12 +632,106 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Draw Visual Grounding Bounding Boxes & Segmentation Masks
+  // ============================================================================
+  // Visual Grounding Bounding Boxes & Segmentation Masks (Phases 2, 4, 5, 6, 7)
+  // ============================================================================
   let cachedMaskUrl = null;
+
+  /**
+   * Calculates the exact pixel rectangle of the rendered image inside its container,
+   * accounting for container size, aspect ratio, letterbox padding, and object-fit
+   * (contain or cover).
+   */
+  function getRenderedImageRect(img, container) {
+    const defaultRect = {
+      x: 0,
+      y: 0,
+      width: (container && container.clientWidth) || 300,
+      height: (container && container.clientHeight) || 200,
+      scale: 1,
+      naturalWidth: 300,
+      naturalHeight: 200,
+      containerWidth: 300,
+      containerHeight: 200,
+      elementWidth: 300,
+      elementHeight: 200,
+      offsetX: 0,
+      offsetY: 0,
+      objectFit: 'contain'
+    };
+
+    if (!img) return defaultRect;
+
+    const naturalW = img.naturalWidth || img.width || 300;
+    const naturalH = img.naturalHeight || img.height || 200;
+
+    const containerW = (container && container.clientWidth) || img.clientWidth || naturalW;
+    const containerH = (container && container.clientHeight) || img.clientHeight || naturalH;
+
+    let baseLeft = 0;
+    let baseTop = 0;
+    let elemW = img.clientWidth || naturalW;
+    let elemH = img.clientHeight || naturalH;
+
+    if (container && typeof container.getBoundingClientRect === 'function' && typeof img.getBoundingClientRect === 'function') {
+      const cRect = container.getBoundingClientRect();
+      const iRect = img.getBoundingClientRect();
+      baseLeft = iRect.left - cRect.left;
+      baseTop = iRect.top - cRect.top;
+      elemW = iRect.width || elemW;
+      elemH = iRect.height || elemH;
+    } else if (img.offsetLeft !== undefined && container) {
+      baseLeft = img.offsetLeft;
+      baseTop = img.offsetTop;
+    }
+
+    let objFit = 'contain';
+    if (typeof window !== 'undefined' && window.getComputedStyle) {
+      try {
+        const cs = window.getComputedStyle(img);
+        if (cs && cs.objectFit) objFit = cs.objectFit;
+      } catch (_) {}
+    }
+
+    let scale, renderedW, renderedH, offsetX, offsetY;
+
+    if (objFit === 'cover') {
+      scale = Math.max(elemW / naturalW, elemH / naturalH);
+      renderedW = naturalW * scale;
+      renderedH = naturalH * scale;
+      offsetX = baseLeft + (elemW - renderedW) / 2;
+      offsetY = baseTop + (elemH - renderedH) / 2;
+    } else {
+      // object-fit: contain (and letterbox padding calculation)
+      scale = Math.min(elemW / naturalW, elemH / naturalH);
+      renderedW = naturalW * scale;
+      renderedH = naturalH * scale;
+      offsetX = baseLeft + (elemW - renderedW) / 2;
+      offsetY = baseTop + (elemH - renderedH) / 2;
+    }
+
+    return {
+      x: offsetX,
+      y: offsetY,
+      width: renderedW,
+      height: renderedH,
+      scale: scale,
+      naturalWidth: naturalW,
+      naturalHeight: naturalH,
+      containerWidth: containerW,
+      containerHeight: containerH,
+      elementWidth: elemW,
+      elementHeight: elemH,
+      baseLeft: baseLeft,
+      baseTop: baseTop,
+      objectFit: objFit
+    };
+  }
 
   function drawGroundingBoxes(boxes, maskUrl = null) {
     const canvas = document.getElementById('groundingCanvas');
     const imagePreview = document.getElementById('imagePreview');
+    const canvasContainer = document.getElementById('canvasContainer');
     const layerControls = document.getElementById('layerControls');
     const toggleGrounding = document.getElementById('toggleGrounding');
 
@@ -654,35 +748,56 @@ document.addEventListener('DOMContentLoaded', () => {
     if (layerControls) layerControls.classList.remove('hidden');
     canvas.classList.remove('hidden');
 
-    const w = (imagePreview && imagePreview.clientWidth) || 300;
-    const h = (imagePreview && imagePreview.clientHeight) || 240;
+    const containerW = (canvasContainer && canvasContainer.clientWidth) || (imagePreview && imagePreview.clientWidth) || 300;
+    const containerH = (canvasContainer && canvasContainer.clientHeight) || (imagePreview && imagePreview.clientHeight) || 240;
 
-    canvas.width = w;
-    canvas.height = h;
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
+    canvas.width = containerW;
+    canvas.height = containerH;
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.clearRect(0, 0, w, h);
+    ctx.clearRect(0, 0, containerW, containerH);
 
-    if (toggleGrounding && !toggleGrounding.checked) return;
+    const rect = getRenderedImageRect(imagePreview, canvasContainer);
+
+    if (toggleGrounding && !toggleGrounding.checked) {
+      updateGroundingDebug(rect, cachedBoxes);
+      return;
+    }
+
+    // Clip to image element bounds if cover mode is active
+    if (rect.objectFit === 'cover' && imagePreview) {
+      const cRect = canvasContainer ? canvasContainer.getBoundingClientRect() : null;
+      const iRect = imagePreview.getBoundingClientRect();
+      const clipX = cRect ? (iRect.left - cRect.left) : 0;
+      const clipY = cRect ? (iRect.top - cRect.top) : 0;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(clipX, clipY, iRect.width, iRect.height);
+      ctx.clip();
+    }
 
     // Draw segmentation mask overlay if available
     if (cachedMaskUrl) {
       const maskImg = new Image();
       maskImg.onload = () => {
         if (toggleGrounding && !toggleGrounding.checked) return;
-        ctx.drawImage(maskImg, 0, 0, w, h);
-        renderBoxOutlines(ctx, cachedBoxes, w, h);
+        ctx.drawImage(maskImg, rect.x, rect.y, rect.width, rect.height);
+        renderBoxOutlines(ctx, cachedBoxes, rect);
+        if (rect.objectFit === 'cover') ctx.restore();
+        updateGroundingDebug(rect, cachedBoxes);
       };
       maskImg.src = cachedMaskUrl;
     } else {
-      renderBoxOutlines(ctx, cachedBoxes, w, h);
+      renderBoxOutlines(ctx, cachedBoxes, rect);
+      if (rect.objectFit === 'cover') ctx.restore();
+      updateGroundingDebug(rect, cachedBoxes);
     }
   }
 
-  function renderBoxOutlines(ctx, boxes, w, h) {
+  function renderBoxOutlines(ctx, boxes, rect) {
     if (!Array.isArray(boxes)) return;
     boxes.forEach((box) => {
       if (!box) return;
@@ -691,10 +806,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const xmax = box.xmax !== undefined ? box.xmax : 1;
       const ymax = box.ymax !== undefined ? box.ymax : 1;
 
-      const bx = xmin * w;
-      const by = ymin * h;
-      const bw = (xmax - xmin) * w;
-      const bh = (ymax - ymin) * h;
+      // Coordinate transformation: map normalized [0, 1] coords to screen pixels
+      const bx = rect.x + xmin * rect.width;
+      const by = rect.y + ymin * rect.height;
+      const bw = (xmax - xmin) * rect.width;
+      const bh = (ymax - ymin) * rect.height;
 
       // Glow outline
       ctx.shadowColor = '#5eead4';
@@ -704,41 +820,156 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx.strokeRect(bx, by, bw, bh);
 
       // Translucent fill
-      ctx.fillStyle = 'rgba(94, 234, 212, 0.10)';
+      ctx.fillStyle = 'rgba(94, 234, 212, 0.12)';
       ctx.fillRect(bx, by, bw, bh);
 
-      // Label badge
+      // Label badge (Phase 6: Honest labeling, distinguishing confidence from mask area)
       ctx.shadowBlur = 0;
-      const confStr = typeof box.confidence === 'number' ? ` (${Math.round(box.confidence * 100)}%)` : '';
-      const covStr = typeof box.mask_coverage_pct === 'number' ? ` [Mask: ${box.mask_coverage_pct}%]` : (typeof box.bbox_coverage_pct === 'number' ? ` [BBox: ${box.bbox_coverage_pct}%]` : '');
+      const confStr = (typeof box.confidence === 'number' && !isNaN(box.confidence))
+        ? ` • Conf: ${Math.round(box.confidence * 100)}%`
+        : '';
+      const covStr = typeof box.mask_coverage_pct === 'number'
+        ? ` • Mask: ${box.mask_coverage_pct}%`
+        : (typeof box.bbox_coverage_pct === 'number' ? ` • Area: ${box.bbox_coverage_pct}%` : '');
       const label = `${box.label || 'Target'}${confStr}${covStr}`;
       ctx.font = '11px JetBrains Mono, monospace';
       const textWidth = ctx.measureText(label).width;
 
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-      ctx.fillRect(bx, Math.max(0, by - 20), textWidth + 12, 18);
+      const badgeY = Math.max(0, by - 20);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+      ctx.fillRect(bx, badgeY, textWidth + 12, 18);
       ctx.strokeStyle = '#5eead4';
       ctx.lineWidth = 1;
-      ctx.strokeRect(bx, Math.max(0, by - 20), textWidth + 12, 18);
+      ctx.strokeRect(bx, badgeY, textWidth + 12, 18);
 
       ctx.fillStyle = '#5eead4';
-      ctx.fillText(label, bx + 6, Math.max(13, by - 6));
+      ctx.fillText(label, bx + 6, badgeY + 13);
     });
+  }
+
+  function updateGroundingDebug(rect, boxes) {
+    const debugBox = document.getElementById('groundingDebugBox');
+    const debugPre = document.getElementById('groundingDebugContent');
+    const toggleDebug = document.getElementById('toggleGroundingDebug');
+    if (!debugPre) return;
+
+    if (!Array.isArray(boxes) || boxes.length === 0) {
+      debugPre.textContent = 'No active grounding detections.';
+      if (debugBox && (!toggleDebug || !toggleDebug.checked)) debugBox.classList.add('hidden');
+      return;
+    }
+
+    const box = boxes[0];
+    const xmin = box.xmin !== undefined ? box.xmin : 0;
+    const ymin = box.ymin !== undefined ? box.ymin : 0;
+    const xmax = box.xmax !== undefined ? box.xmax : 1;
+    const ymax = box.ymax !== undefined ? box.ymax : 1;
+
+    const rawX1 = Math.round(xmin * rect.naturalWidth);
+    const rawY1 = Math.round(ymin * rect.naturalHeight);
+    const rawX2 = Math.round(xmax * rect.naturalWidth);
+    const rawY2 = Math.round(ymax * rect.naturalHeight);
+    const rawW = rawX2 - rawX1;
+    const rawH = rawY2 - rawY1;
+
+    const bx = rect.x + xmin * rect.width;
+    const by = rect.y + ymin * rect.height;
+    const bw = (xmax - xmin) * rect.width;
+    const bh = (ymax - ymin) * rect.height;
+
+    const confDisplay = typeof box.confidence === 'number'
+      ? `${(box.confidence * 100).toFixed(1)}% (${box.confidence_type || 'heuristic'})`
+      : 'Uncalibrated / Heuristic';
+    const maskCov = typeof box.mask_coverage_pct === 'number' ? `${box.mask_coverage_pct}%` : 'N/A';
+    const bboxCov = typeof box.bbox_coverage_pct === 'number' ? `${box.bbox_coverage_pct}%` : 'N/A';
+
+    const debugText = [
+      `Original:    ${rect.naturalWidth} × ${rect.naturalHeight}`,
+      `Mask bbox:   x=${rawX1} y=${rawY1} w=${rawW} h=${rawH}`,
+      `Normalized:  x1=${xmin.toFixed(4)} y1=${ymin.toFixed(4)} x2=${xmax.toFixed(4)} y2=${ymax.toFixed(4)}`,
+      `Rendered:    x=${Math.round(bx)} y=${Math.round(by)} w=${Math.round(bw)} h=${Math.round(bh)}`,
+      `Offset/Scale: offsetX=${Math.round(rect.x)} offsetY=${Math.round(rect.y)} scale=${rect.scale.toFixed(4)}`,
+      `Container:   ${rect.containerWidth} × ${rect.containerHeight} (fit: ${rect.objectFit})`,
+      `Metrics:     Label=${box.label || 'Target'} | Conf=${confDisplay}`,
+      `Coverage:    Mask=${maskCov} | BBox=${bboxCov}`
+    ].join('\n');
+
+    debugPre.textContent = debugText;
+
+    if (toggleDebug && toggleDebug.checked && debugBox) {
+      debugBox.classList.remove('hidden');
+    }
+
+    // Phase 1 console coordinate logging for verification
+    if (window.SATQUERY_DEBUG || (toggleDebug && toggleDebug.checked)) {
+      console.log('[Grounding Coordinate Diagnostic]\n' + debugText);
+    }
   }
 
   function clearGroundingCanvas() {
     cachedBoxes = [];
     cachedMaskUrl = null;
     const canvas = document.getElementById('groundingCanvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-    canvas.classList.add('hidden');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.classList.add('hidden');
+    }
+    const debugBox = document.getElementById('groundingDebugBox');
+    if (debugBox) debugBox.classList.add('hidden');
+  }
+
+  // Re-render grounding overlays dynamically on container resize
+  window.addEventListener('resize', () => {
+    if (cachedBoxes && cachedBoxes.length > 0) {
+      drawGroundingBoxes(cachedBoxes, cachedMaskUrl);
+    }
+  });
+
+  // Re-render when primary image preview finishes loading
+  const mainImageElem = document.getElementById('imagePreview');
+  if (mainImageElem) {
+    mainImageElem.addEventListener('load', () => {
+      if (cachedBoxes && cachedBoxes.length > 0) {
+        drawGroundingBoxes(cachedBoxes, cachedMaskUrl);
+      }
+    });
   }
 
   if (toggleGrounding) {
     toggleGrounding.addEventListener('change', () => {
       drawGroundingBoxes(cachedBoxes, cachedMaskUrl);
+    });
+  }
+
+  const toggleGroundingDebug = document.getElementById('toggleGroundingDebug');
+  if (toggleGroundingDebug) {
+    toggleGroundingDebug.addEventListener('change', () => {
+      const debugBox = document.getElementById('groundingDebugBox');
+      if (debugBox) {
+        if (toggleGroundingDebug.checked) {
+          debugBox.classList.remove('hidden');
+          const imagePreview = document.getElementById('imagePreview');
+          const canvasContainer = document.getElementById('canvasContainer');
+          const rect = getRenderedImageRect(imagePreview, canvasContainer);
+          updateGroundingDebug(rect, cachedBoxes);
+        } else {
+          debugBox.classList.add('hidden');
+        }
+      }
+    });
+  }
+
+  const btnCopyDebugCoords = document.getElementById('btnCopyDebugCoords');
+  if (btnCopyDebugCoords) {
+    btnCopyDebugCoords.addEventListener('click', () => {
+      const pre = document.getElementById('groundingDebugContent');
+      if (pre && navigator.clipboard) {
+        navigator.clipboard.writeText(pre.textContent).then(() => {
+          btnCopyDebugCoords.textContent = 'Copied!';
+          setTimeout(() => { btnCopyDebugCoords.textContent = 'Copy'; }, 1500);
+        });
+      }
     });
   }
 

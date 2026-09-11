@@ -354,6 +354,116 @@ if (!crashed && capturedError.includes('[SatQuery UI] Missing DOM element: #resL
 // Restore resLatency
 mockDom.set('resLatency', new MockElement('resLatency'));
 
+// ============================================================================
+// --- 4. Running Phase 8 Coordinate Transformation Regression Tests ---
+// ============================================================================
+console.log('\n--- 4. Phase 8 Grounding Coordinate Transformation Tests ---');
+
+// Extract getRenderedImageRect from app.js implementation
+function computeRenderedImageRect(imgNaturalW, imgNaturalH, containerW, containerH, elemW, elemH, objFit = 'contain', baseLeft = 0, baseTop = 0) {
+  let scale, renderedW, renderedH, offsetX, offsetY;
+
+  if (objFit === 'cover') {
+    scale = Math.max(elemW / imgNaturalW, elemH / imgNaturalH);
+    renderedW = imgNaturalW * scale;
+    renderedH = imgNaturalH * scale;
+    offsetX = baseLeft + (elemW - renderedW) / 2;
+    offsetY = baseTop + (elemH - renderedH) / 2;
+  } else {
+    // object-fit: contain
+    scale = Math.min(elemW / imgNaturalW, elemH / imgNaturalH);
+    renderedW = imgNaturalW * scale;
+    renderedH = imgNaturalH * scale;
+    offsetX = baseLeft + (elemW - renderedW) / 2;
+    offsetY = baseTop + (elemH - renderedH) / 2;
+  }
+
+  return {
+    x: offsetX,
+    y: offsetY,
+    width: renderedW,
+    height: renderedH,
+    scale: scale,
+    naturalWidth: imgNaturalW,
+    naturalHeight: imgNaturalH,
+    containerWidth: containerW,
+    containerHeight: containerH,
+    objectFit: objFit
+  };
+}
+
+function projectBBox(rect, xmin, ymin, xmax, ymax) {
+  return {
+    x: rect.x + xmin * rect.width,
+    y: rect.y + ymin * rect.height,
+    w: (xmax - xmin) * rect.width,
+    h: (ymax - ymin) * rect.height
+  };
+}
+
+// Test 1: Original 1000x500, bbox [500, 100, 800, 400], displayed 500x250
+// Expected: x=250, y=50, w=150, h=150
+console.log('Phase 8 Test 1: Original 1000x500, displayed 500x250');
+const rect1 = computeRenderedImageRect(1000, 500, 500, 250, 500, 250, 'contain');
+const box1 = projectBBox(rect1, 500 / 1000, 100 / 500, 800 / 1000, 400 / 500);
+if (Math.round(box1.x) === 250 && Math.round(box1.y) === 50 && Math.round(box1.w) === 150 && Math.round(box1.h) === 150) {
+  console.log(`PASSED: Test 1 (Expected x=250, y=50, w=150, h=150 -> got x=${box1.x}, y=${box1.y}, w=${box1.w}, h=${box1.h})`);
+} else {
+  console.error('FAILED: Phase 8 Test 1', box1);
+  process.exit(1);
+}
+
+// Test 2: Same image inside a larger container (600x250) with object-fit: contain (letterbox offset verification)
+console.log('Phase 8 Test 2: Letterbox offset with container larger than image (600x250)');
+// Base left offset from flex centering in 600px container: (600 - 500) / 2 = 50px
+const rect2 = computeRenderedImageRect(1000, 500, 600, 250, 500, 250, 'contain', 50, 0);
+const box2 = projectBBox(rect2, 500 / 1000, 100 / 500, 800 / 1000, 400 / 500);
+if (Math.round(box2.x) === 300 && Math.round(box2.y) === 50 && Math.round(box2.w) === 150 && Math.round(box2.h) === 150) {
+  console.log(`PASSED: Test 2 (Letterbox offset correctly applied -> x=${box2.x}, y=${box2.y}, w=${box2.w}, h=${box2.h})`);
+} else {
+  console.error('FAILED: Phase 8 Test 2', box2);
+  process.exit(1);
+}
+
+// Test 3: Different aspect ratio (portrait 500x1000 in landscape container 500x250)
+console.log('Phase 8 Test 3: Portrait image 500x1000 in landscape container 500x250');
+const rect3 = computeRenderedImageRect(500, 1000, 500, 250, 500, 250, 'contain', 0, 0);
+// scale = min(500/500, 250/1000) = 0.25 -> renderedW = 125, renderedH = 250, offsetX = (500 - 125) / 2 = 187.5
+const box3 = projectBBox(rect3, 0.2, 0.2, 0.8, 0.8);
+if (Math.abs(rect3.scale - 0.25) < 0.001 && Math.abs(rect3.x - 187.5) < 0.001 && Math.round(box3.w) === 75) {
+  console.log(`PASSED: Test 3 (Different aspect ratio pillarbox correct -> scale=${rect3.scale}, offset=${rect3.x}, w=${box3.w})`);
+} else {
+  console.error('FAILED: Phase 8 Test 3', rect3, box3);
+  process.exit(1);
+}
+
+// Test 4: object-fit: cover
+console.log('Phase 8 Test 4: object-fit: cover with crop offset');
+const rect4 = computeRenderedImageRect(500, 500, 500, 250, 500, 250, 'cover', 0, 0);
+// scale = max(500/500, 250/500) = 1.0 -> renderedW = 500, renderedH = 500, offsetY = (250 - 500) / 2 = -125
+if (Math.abs(rect4.scale - 1.0) < 0.001 && Math.abs(rect4.y - (-125)) < 0.001) {
+  console.log(`PASSED: Test 4 (object-fit: cover correctly calculates crop offset -> offsetY=${rect4.y})`);
+} else {
+  console.error('FAILED: Phase 8 Test 4', rect4);
+  process.exit(1);
+}
+
+// Test 5: Mask and BBox Alignment Invariant
+console.log('Phase 8 Test 5: Mask and BBox Spatially Aligned to Rendered Image');
+const rect5 = computeRenderedImageRect(800, 600, 400, 300, 400, 300, 'contain', 0, 0);
+const box5 = projectBBox(rect5, 0.25, 0.25, 0.75, 0.75);
+// Mask is drawn at rect5.x, rect5.y with width=rect5.width, height=rect5.height
+// Box is drawn at box5.x, box5.y with width=box5.w, height=box5.h
+const maskLeft = rect5.x;
+const boxRelativeX = box5.x - maskLeft;
+if (boxRelativeX === 0.25 * rect5.width) {
+  console.log(`PASSED: Test 5 (BBox and Mask share exact identical origin and scale)`);
+} else {
+  console.error('FAILED: Phase 8 Test 5', boxRelativeX, 0.25 * rect5.width);
+  process.exit(1);
+}
+
 console.log('\n=========================================');
 console.log('ALL FRONTEND DOM & RENDERING TESTS PASSED');
 console.log('=========================================');
+

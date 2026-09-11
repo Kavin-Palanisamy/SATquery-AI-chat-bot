@@ -18,8 +18,15 @@ def get_logger(name: str) -> logging.Logger:
     """Returns a logger instance with standardized formatting."""
     return logging.getLogger(name)
 
+import tempfile
+
 # Provenance Execution Recording
-PROVENANCE_FILE = Path("outputs") / "executions.jsonl"
+try:
+    outputs_dir = Path("outputs")
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+    PROVENANCE_FILE = outputs_dir / "executions.jsonl"
+except (OSError, PermissionError):
+    PROVENANCE_FILE = Path(tempfile.gettempdir()) / "executions.jsonl"
 
 def record_execution(
     task: str,
@@ -32,7 +39,10 @@ def record_execution(
     confidence: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Records an inference execution trace for auditability and provenance."""
-    PROVENANCE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        PROVENANCE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    except (OSError, PermissionError):
+        pass
     
     record = {
         "task": task,

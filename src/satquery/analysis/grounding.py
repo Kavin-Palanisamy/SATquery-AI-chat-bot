@@ -534,20 +534,27 @@ class HeuristicGroundingModel(BaseGroundingModel):
         spectral_contrast = 1.0
         overlay_color = (94, 234, 212)
 
+        valid_pixel = brightness >= 8
+        is_veg = (g > r + 6) & (g > b) & (g > 30)
+
         # ---------------------------------------------------------------------
         # 1. Target Spectral Class Rules
         # ---------------------------------------------------------------------
         if "water" in tgt_lower or "lake" in tgt_lower or "river" in tgt_lower or "sea" in tgt_lower or "ocean" in tgt_lower:
-            # Water: distinct blue dominance over red, low red reflectance, or dark absorption
-            water_mask = ((b > r + 12) & (b > g - 12) & (r < 120)) | ((b > 85) & (g > 80) & (r < 65) & (brightness < 170))
+            # Water: distinct blue dominance over red, dark water absorption, or cyan/inland water
+            # Strictly excludes agricultural/green vegetation where chlorophyll absorbs red
+            blue_water = (b > r + 8) & (b >= g - 2) & (r < 125) & (~is_veg)
+            dark_water = (brightness < 60) & (b > r + 3) & (r < 50) & (~is_veg)
+            inland_water = (b > 75) & (g > 70) & (r < 60) & (b >= g - 3) & (brightness < 165) & (~is_veg)
+            water_mask = valid_pixel & (blue_water | dark_water | inland_water)
             candidate_components = find_connected_regions(water_mask, min_pixels=35, min_area_pct=0.35)
             label_prefix = "Water Body" if "water" in tgt_lower else tgt.title()
             spectral_contrast = 1.2
             overlay_color = (56, 189, 248)
 
         elif "urban" in tgt_lower or "building" in tgt_lower or "built-up" in tgt_lower or "house" in tgt_lower or "structure" in tgt_lower:
-            # Built-up / Structures: moderate-to-high brightness, low color saturation, non-water
-            urban_mask = (color_sat < 35) & (brightness > 65) & (brightness < 235)
+            # Built-up / Structures: moderate-to-high brightness, low color saturation, non-water, non-vegetation
+            urban_mask = valid_pixel & (color_sat < 35) & (brightness > 65) & (brightness < 235) & (~is_veg)
             candidate_components = find_connected_regions(urban_mask, min_pixels=45, min_area_pct=0.5)
             label_prefix = "Built-up Area" if ("built-up" in tgt_lower or "urban" in tgt_lower) else "Buildings"
             spectral_contrast = 1.1
@@ -555,7 +562,7 @@ class HeuristicGroundingModel(BaseGroundingModel):
 
         elif "agri" in tgt_lower or "crop" in tgt_lower or "farm" in tgt_lower:
             # Agricultural fields
-            agri_mask = (g > r + 8) & (g > b + 4) & (g > 35)
+            agri_mask = valid_pixel & (g > r + 6) & (g > b + 2) & (g > 35)
             candidate_components = find_connected_regions(agri_mask, min_pixels=45, min_area_pct=0.5)
             label_prefix = "Agricultural Parcel"
             spectral_contrast = 1.15
@@ -563,7 +570,7 @@ class HeuristicGroundingModel(BaseGroundingModel):
 
         elif "veg" in tgt_lower or "forest" in tgt_lower or "tree" in tgt_lower or "green" in tgt_lower:
             # Vegetation / Forest Canopy
-            veg_mask = (g > r + 8) & (g > b + 4) & (g > 30)
+            veg_mask = valid_pixel & (g > r + 6) & (g > b + 2) & (g > 30)
             candidate_components = find_connected_regions(veg_mask, min_pixels=45, min_area_pct=0.45)
             label_prefix = "Forest Canopy" if "forest" in tgt_lower else "Vegetation"
             spectral_contrast = 1.2
@@ -571,7 +578,7 @@ class HeuristicGroundingModel(BaseGroundingModel):
 
         elif "soil" in tgt_lower or "bare" in tgt_lower or "substrate" in tgt_lower or "dirt" in tgt_lower:
             # Soil / Bare ground
-            soil_mask = (r > g) & (g > b) & (r > 70) & (color_sat >= 15)
+            soil_mask = valid_pixel & (r > g) & (g > b) & (r > 70) & (color_sat >= 15)
             candidate_components = find_connected_regions(soil_mask, min_pixels=40, min_area_pct=0.45)
             label_prefix = "Exposed Soil"
             spectral_contrast = 1.05
@@ -579,28 +586,28 @@ class HeuristicGroundingModel(BaseGroundingModel):
 
         elif "runway" in tgt_lower or "airport" in tgt_lower:
             # Paved linear corridors
-            paved_mask = (color_sat < 22) & (brightness > 50) & (brightness < 175)
+            paved_mask = valid_pixel & (color_sat < 22) & (brightness > 50) & (brightness < 175)
             candidate_components = find_connected_regions(paved_mask, min_pixels=50, min_area_pct=0.7)
             label_prefix = "Runway Corridor"
             spectral_contrast = 1.1
             overlay_color = (148, 163, 184)
 
         elif "road" in tgt_lower or "highway" in tgt_lower or "street" in tgt_lower:
-            road_mask = (color_sat < 25) & (brightness > 45) & (brightness < 165)
+            road_mask = valid_pixel & (color_sat < 25) & (brightness > 45) & (brightness < 165)
             candidate_components = find_connected_regions(road_mask, min_pixels=40, min_area_pct=0.35)
             label_prefix = "Road Network"
             spectral_contrast = 1.05
             overlay_color = (203, 213, 225)
 
         elif "solar" in tgt_lower or "photovoltaic" in tgt_lower:
-            solar_mask = (b > r + 10) & (b < 95) & (r < 65) & (g < 75)
+            solar_mask = valid_pixel & (b > r + 10) & (b < 95) & (r < 65) & (g < 75)
             candidate_components = find_connected_regions(solar_mask, min_pixels=35, min_area_pct=0.35)
             label_prefix = "Solar PV Array"
             spectral_contrast = 1.15
             overlay_color = (99, 102, 241)
 
         elif "ship" in tgt_lower or "vessel" in tgt_lower or "boat" in tgt_lower:
-            ship_mask = (brightness > 175) & (color_sat < 50)
+            ship_mask = valid_pixel & (brightness > 175) & (color_sat < 50)
             candidate_components = find_connected_regions(ship_mask, min_pixels=20, min_area_pct=0.15)
             label_prefix = "Maritime Vessel"
             spectral_contrast = 1.2
@@ -699,6 +706,33 @@ class HeuristicGroundingModel(BaseGroundingModel):
             f"Detected mask covers {mask_coverage}% of the image (heuristic grounding)."
         )
 
+        # Diagnostic coordinate record (Phase 1 & Phase 7)
+        debug_coords = {
+            "image_width": img_w,
+            "image_height": img_h,
+            "raw_pixel_bbox": [
+                int(primary_box.xmin * img_w),
+                int(primary_box.ymin * img_h),
+                int(primary_box.xmax * img_w),
+                int(primary_box.ymax * img_h),
+            ],
+            "normalized_bbox": [
+                primary_box.xmin,
+                primary_box.ymin,
+                primary_box.xmax,
+                primary_box.ymax,
+            ],
+            "mask_area_pct": mask_coverage,
+            "bbox_area_pct": bbox_coverage,
+            "coordinate_system": "normalized_xyxy",
+        }
+        logger.info(
+            f"[Grounding Coordinates Debug] Target='{tgt}' | Original: {img_w}x{img_h} | "
+            f"Raw BBox Px: {debug_coords['raw_pixel_bbox']} | "
+            f"Normalized BBox: {debug_coords['normalized_bbox']} | "
+            f"Mask: {mask_coverage}% | BBox: {bbox_coverage}%"
+        )
+
         return GroundingResult(
             task="grounding",
             target=tgt,
@@ -725,6 +759,7 @@ class HeuristicGroundingModel(BaseGroundingModel):
                 "percentage_coordinates": pct_info,
                 "location_description": loc_desc,
                 "rejections": rejections,
+                "debug_coordinates": debug_coords,
             },
         )
 

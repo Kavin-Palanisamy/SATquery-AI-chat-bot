@@ -930,6 +930,60 @@ input[type="text"]:focus {
   cursor: pointer;
 }
 
+.grounding-debug-box {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(94, 234, 212, 0.28);
+  border-radius: var(--radius-sm);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #94a3b8;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.debug-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.debug-title {
+  color: #5eead4;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
+
+.btn-debug-copy {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  padding: 2px 8px;
+  font-size: 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-debug-copy:hover {
+  background: rgba(94, 234, 212, 0.2);
+  color: #5eead4;
+}
+
+.debug-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
 .preview-placeholder {
   color: #6f7a8c;
   font-size: 13px;

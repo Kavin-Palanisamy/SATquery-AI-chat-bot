@@ -332,6 +332,19 @@
                 <input type="checkbox" id="toggleChange" checked>
                 <span>Show Change Map</span>
               </label>
+              <label class="layer-toggle" id="toggleGroundingDebugLayer">
+                <input type="checkbox" id="toggleGroundingDebug">
+                <span>Debug Coordinates</span>
+              </label>
+            </div>
+
+            <!-- Grounding Coordinates Diagnostic Drawer (Phase 7) -->
+            <div class="grounding-debug-box hidden" id="groundingDebugBox">
+              <div class="debug-header">
+                <span class="debug-title">Grounding Coordinate Diagnostic</span>
+                <button type="button" class="btn-debug-copy" id="btnCopyDebugCoords" title="Copy coordinate diagnostic">Copy</button>
+              </div>
+              <pre class="debug-pre" id="groundingDebugContent"></pre>
             </div>
 
             <!-- Image Details Drawer -->
@@ -521,7 +534,7 @@
       <div class="footer-content">
         <div class="footer-brand">
           <div class="logo">SatQuery<span>.ai</span></div>
-          <p>Easy AI assistant for satellite imagery • Team Saverra (IIT Madras BS)</p>
+          <p>Easy AI assistant for satellite imagery</p>
         </div>
         <div class="footer-meta">
           <span>SIH26167 • Space Technology</span>

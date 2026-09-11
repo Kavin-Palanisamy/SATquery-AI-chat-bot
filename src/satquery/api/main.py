@@ -64,8 +64,12 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-TEMP_UPLOAD_DIR = Path("outputs") / "temp_uploads"
-TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    TEMP_UPLOAD_DIR = Path("outputs") / "temp_uploads"
+    TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+except (OSError, PermissionError):
+    TEMP_UPLOAD_DIR = Path(tempfile.gettempdir()) / "satquery_uploads"
+    TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @app.get("/health")
@@ -386,9 +390,10 @@ async def generate_audit_report(execution_idx: int = 0) -> PlainTextResponse:
 
 
 # Mount static files and multi-route page handlers for Web UI
-web_dir = Path("web")
+root_dir = Path(__file__).resolve().parent.parent.parent.parent
+web_dir = root_dir / "web" if (root_dir / "web").exists() else Path("web")
 if web_dir.exists():
-    app.mount("/static", StaticFiles(directory="web"), name="static")
+    app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
 
     @app.get("/")
     @app.get("/overview")
@@ -399,4 +404,4 @@ if web_dir.exists():
     @app.get("/provenance")
     async def serve_app_view():
         """Serves the main application with client-side route hydration."""
-        return FileResponse(web_dir / "index.html")
+        return FileResponse(str(web_dir / "index.html"))
