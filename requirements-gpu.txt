@@ -1,9 +1,9 @@
-# Deep Learning & Vision-Language Models (For GPU Servers / Local Full-Weight Inference)
+# Extended Geospatial, Deep Learning & Vision-Language Models (For GPU Servers / Local Inference)
 -r requirements.txt
+rasterio>=1.3.8
 torch>=2.1.0
 torchvision>=0.16.0
 transformers>=4.45.0
 accelerate>=0.26.0
 ipykernel>=6.29.0
 matplotlib>=3.8.0
-pytest>=8.0.0

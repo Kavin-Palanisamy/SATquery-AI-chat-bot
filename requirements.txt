@@ -1,5 +1,4 @@
-# Core Geospatial & Imaging
-rasterio>=1.3.8
+# Core Geospatial & Imaging (Pure / ManyLinux compatible for Serverless & Cloud)
 numpy>=1.24.0,<2.0.0
 pillow>=10.0.0
 
