@@ -219,10 +219,3 @@ satquery-ai/
 
 ---
 
-## 👥 8. Team Details (Team Saverra — IIT Madras BS Degree Programme)
-- **Kumar Amityush** (Team Leader) — *AI/ML & Overall Development*
-- **Shreya Shrikant Jadhav** — *Research, Testing & Evaluation*
-- **Rashes Kumar Tripathy** — *Vision Language Models & Fine-tuning*
-- **Samadrita Dutta Gupta** — *Backend & Integration*
-- **Shivam Kumar** — *Frontend & Visualisation*
-- **Pavitra Patel** — *Remote Sensing & Image Processing*
